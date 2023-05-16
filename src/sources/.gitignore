@@ -1,0 +1,5 @@
+/dist
+*.env
+.scrtsync.json
+.scrtsync.*.json
+!.scrtsync.default.json
