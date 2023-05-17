@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 
+#[derive(Debug)]
 pub struct Secrets {
     pub content: BTreeMap<String, String>,
 }
@@ -63,13 +64,52 @@ mod tests {
     use std::collections::BTreeMap;
 
     #[test]
-    fn from_btreemap() {
+    fn from_btreemap_borrow() {
         let mut map = BTreeMap::new();
         map.insert("foo".to_string(), "bar".to_string());
         map.insert("baz".to_string(), "qux".to_string());
-
         let secrets = Secrets::from(&map);
 
         assert_eq!(secrets.content, map);
+    }
+
+    #[test]
+    fn from_btreemap_own() {
+        let mut map = BTreeMap::new();
+        map.insert("foo".to_string(), "bar".to_string());
+        map.insert("baz".to_string(), "qux".to_string());
+        let secrets = Secrets::from(map.clone());
+
+        assert_eq!(secrets.content, map);
+    }
+
+    #[test]
+    fn from_reader() {
+        let mut expected = BTreeMap::new();
+        expected.insert("foo".to_string(), "bar".to_string());
+        expected.insert("baz".to_string(), "qux".to_string());
+
+        let input = "baz=\"qux\"\nfoo=\"bar\"\n";
+        let mut buf = input.as_bytes();
+        let result = Secrets::from_reader(&mut buf).unwrap();
+
+        assert_eq!(expected, result.content);
+    }
+
+    #[test]
+    fn to_env() {
+        let mut map = BTreeMap::new();
+        map.insert("foo".to_string(), "bar".to_string());
+        map.insert("baz".to_string(), "qux".to_string());
+        let secrets = Secrets::from(map);
+
+        let mut buf: Vec<u8> = vec![];
+        secrets.to_writer(&mut buf).unwrap();
+        let secret_string = String::from_utf8(buf).unwrap();
+
+        // Note: Keys are sorted alphabetically
+        let expected = "baz=\"qux\"\nfoo=\"bar\"\n";
+
+        assert_eq!(secret_string, expected);
     }
 }
