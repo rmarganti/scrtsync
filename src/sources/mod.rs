@@ -2,7 +2,7 @@ use std::{error, fmt};
 use url::Url;
 
 mod file;
-mod k8s;
+// mod k8s;
 mod stdinout;
 mod vault;
 
@@ -17,7 +17,7 @@ impl dyn Source {
 
         let source: Box<dyn Source> = match url.scheme() {
             "file" => Box::new(file::FileSource::new(&url)?),
-            "k8s" | "kubernetes" => Box::new(k8s::K8sSource::new(&url)?),
+            // "k8s" | "kubernetes" => Box::new(k8s::K8sSource::new(&url)?),
             "std" => Box::new(stdinout::StdInOutSource::new()?),
             "vault" => Box::new(vault::VaultSource::new(&url)?),
             _ => {

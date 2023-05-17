@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
 pub struct Secrets {
-    content: BTreeMap<String, String>,
+    pub content: BTreeMap<String, String>,
 }
 
 impl Secrets {
@@ -34,6 +34,13 @@ impl Secrets {
         }
 
         Ok(())
+    }
+}
+
+impl From<BTreeMap<String, String>> for Secrets {
+    // Create a Secrets from a BTreeMap
+    fn from(map: BTreeMap<String, String>) -> Self {
+        Self { content: map }
     }
 }
 
