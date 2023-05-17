@@ -14,6 +14,6 @@ impl super::Source for StdInOutSource {
     }
 
     fn write_secrets(&self, secrets: &crate::secrets::Secrets) -> crate::Result<()> {
-        secrets.to_env(&mut std::io::stdout())
+        secrets.to_writer(&mut std::io::stdout())
     }
 }

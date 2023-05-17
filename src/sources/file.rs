@@ -25,6 +25,6 @@ impl super::Source for FileSource {
     fn write_secrets(&self, secrets: &crate::secrets::Secrets) -> crate::Result<()> {
         eprintln!("Writing secrets to file at {}", self.path);
         let mut file = std::fs::File::create(&self.path)?;
-        secrets.to_env(&mut file)
+        secrets.to_writer(&mut file)
     }
 }

@@ -4,6 +4,8 @@ pub struct Secrets {
     pub content: BTreeMap<String, String>,
 }
 
+/// Secrets is a container for secrets. It is a wrapper around a BTreeMap,
+/// which means secrets are sorted alphabetically by key.
 impl Secrets {
     pub fn new() -> Self {
         Self {
@@ -11,6 +13,7 @@ impl Secrets {
         }
     }
 
+    /// Read a buffer of dotenv-style `KEY="VALUE"` lines into a Secrets struct.
     pub fn from_reader<T: std::io::Read>(reader: &mut T) -> crate::Result<Self> {
         let mut secrets = Self::new();
 
@@ -28,7 +31,8 @@ impl Secrets {
         Ok(secrets)
     }
 
-    pub fn to_env<T: std::io::Write>(&self, buf: &mut T) -> crate::Result<()> {
+    /// Write secrets as dotenv-style `KEY="VALUE"` lines
+    pub fn to_writer<T: std::io::Write>(&self, buf: &mut T) -> crate::Result<()> {
         for (key, value) in &self.content {
             buf.write(format!("{}=\"{}\"\n", key, value).as_bytes())?;
         }
