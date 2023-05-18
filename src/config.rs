@@ -1,3 +1,4 @@
+use anyhow::{Context, Result};
 use clap::Parser;
 use serde::Deserialize;
 use serde_json;
@@ -37,7 +38,7 @@ pub struct PresetConfig {
 }
 
 impl Config {
-    pub fn from_file(path: &str) -> crate::Result<Config> {
+    pub fn from_file(path: &str) -> Result<Config> {
         let exists = path::Path::new(path).exists();
 
         // If the file does not exist, return default config
@@ -45,9 +46,10 @@ impl Config {
             return Ok(Config::default());
         }
 
-        let file = fs::File::open(path)?;
+        let file = fs::File::open(path).with_context(|| "Could not open config")?;
         let reader = io::BufReader::new(file);
-        let cfg: Config = serde_json::from_reader(reader)?;
+        let cfg: Config =
+            serde_json::from_reader(reader).with_context(|| "Could not parse config file")?;
 
         Ok(cfg)
     }

@@ -1,4 +1,4 @@
-use std::{error, fmt};
+use anyhow::{anyhow, Context, Result};
 use url::Url;
 
 mod file;
@@ -7,22 +7,30 @@ mod stdinout;
 mod vault;
 
 pub trait Source {
-    fn read_secrets(&self) -> crate::Result<crate::secrets::Secrets>;
-    fn write_secrets(&self, secrets: &crate::secrets::Secrets) -> crate::Result<()>;
+    fn read_secrets(&self) -> Result<crate::secrets::Secrets>;
+    fn write_secrets(&self, secrets: &crate::secrets::Secrets) -> Result<()>;
 }
 
 impl dyn Source {
-    pub fn new(uri: &str) -> crate::Result<Box<dyn Source>> {
-        let url = Url::parse(uri)?;
+    pub fn new(uri: &str) -> Result<Box<dyn Source>> {
+        let url = Url::parse(uri).with_context(|| "Unable to parse source URL")?;
 
         let source: Box<dyn Source> = match url.scheme() {
-            "file" => Box::new(file::FileSource::new(&url)?),
+            "file" => Box::new(
+                file::FileSource::new(&url).with_context(|| "Could not build file source")?,
+            ),
             // "k8s" | "kubernetes" => Box::new(k8s::K8sSource::new(&url)?),
-            "std" => Box::new(stdinout::StdInOutSource::new()?),
-            "vault" => Box::new(vault::VaultSource::new(&url)?),
+            "std" => Box::new(
+                stdinout::StdInOutSource::new()
+                    .with_context(|| "Could not build stdin/out source")?,
+            ),
+            "vault" => Box::new(
+                vault::VaultSource::new(&url).with_context(|| "Could not build Vault source")?,
+            ),
             _ => {
-                return Err(Box::new(UnsupportedSourceError::new(
-                    url.scheme().to_string(),
+                return Err(anyhow!(format!(
+                    "Unsupported source scheme: {}",
+                    url.scheme()
                 )));
             }
         };
@@ -30,26 +38,3 @@ impl dyn Source {
         Ok(source)
     }
 }
-
-#[derive(Debug, Clone)]
-struct UnsupportedSourceError {
-    scheme: String,
-}
-
-impl UnsupportedSourceError {
-    fn new(scheme: String) -> Self {
-        UnsupportedSourceError { scheme }
-    }
-}
-
-impl fmt::Display for UnsupportedSourceError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "invalid source scheme: `{}`, supported schemes: `file`",
-            self.scheme,
-        )
-    }
-}
-
-impl error::Error for UnsupportedSourceError {}

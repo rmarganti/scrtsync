@@ -1,3 +1,4 @@
+use anyhow::{Context, Result};
 use std::collections::BTreeMap;
 
 #[derive(Debug)]
@@ -15,11 +16,13 @@ impl Secrets {
     }
 
     /// Read a buffer of dotenv-style `KEY="VALUE"` lines into a Secrets struct.
-    pub fn from_reader<T: std::io::Read>(reader: &mut T) -> crate::Result<Self> {
+    pub fn from_reader<T: std::io::Read>(reader: &mut T) -> Result<Self> {
         let mut secrets = Self::new();
 
         let mut buffer = String::new();
-        reader.read_to_string(&mut buffer)?;
+        reader
+            .read_to_string(&mut buffer)
+            .with_context(|| "Unable to read secrets")?;
 
         for line in buffer.lines() {
             let mut parts = line.split('=');
@@ -33,9 +36,10 @@ impl Secrets {
     }
 
     /// Write secrets as dotenv-style `KEY="VALUE"` lines
-    pub fn to_writer<T: std::io::Write>(&self, buf: &mut T) -> crate::Result<()> {
+    pub fn to_writer<T: std::io::Write>(&self, buf: &mut T) -> Result<()> {
         for (key, value) in &self.content {
-            buf.write(format!("{}=\"{}\"\n", key, value).as_bytes())?;
+            buf.write(format!("{}=\"{}\"\n", key, value).as_bytes())
+                .with_context(|| "Unable to write secrets")?;
         }
 
         Ok(())

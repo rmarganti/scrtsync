@@ -1,13 +1,14 @@
-mod init;
-mod sync;
-
 use crate::sources::Source;
+use anyhow::Result;
 use atty;
 use std::error;
 use std::fmt;
 
+mod init;
+mod sync;
+
 pub trait Job {
-    fn run(&self) -> crate::Result<()>;
+    fn run(&self) -> Result<()>;
 }
 
 pub fn new_job(
@@ -15,7 +16,7 @@ pub fn new_job(
     from: Option<String>,
     to: Option<String>,
     preset: Option<String>,
-) -> crate::Result<Box<dyn Job>> {
+) -> Result<Box<dyn Job>> {
     if preset == Some("init".to_string()) {
         return Ok(Box::new(init::InitJob {}));
     }
@@ -33,7 +34,7 @@ pub fn new_job(
         .or(preset_cfg.map(|p| p.from.clone())) // Then see if a preset was specified
         .map(|uri| <dyn Source>::new(&uri)) // Build the Source
         .unwrap_or_else(|| {
-            return Err(Box::new(NoSourceProvidedError::new("from")));
+            return Err(NoSourceProvidedError::new("from").into());
         })?;
 
     let to = if atty::is(atty::Stream::Stdout) {
@@ -47,7 +48,7 @@ pub fn new_job(
         .or(preset_cfg.map(|p| p.to.clone())) // Then see if a preset was specified
         .map(|uri| <dyn Source>::new(&uri)) // Build the Source
         .unwrap_or_else(|| {
-            return Err(Box::new(NoSourceProvidedError::new("to")));
+            return Err(NoSourceProvidedError::new("to").into());
         })?;
 
     return Ok(Box::new(sync::SyncJob::new(from, to)));

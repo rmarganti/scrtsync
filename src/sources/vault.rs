@@ -1,4 +1,5 @@
 use crate::secrets::Secrets;
+use anyhow::{anyhow, Context, Result};
 use dirs;
 use serde::Deserialize;
 use serde::Serialize;
@@ -15,7 +16,7 @@ pub struct VaultSource {
 }
 
 impl VaultSource {
-    pub fn new(url: &url::Url) -> crate::Result<Self> {
+    pub fn new(url: &url::Url) -> Result<Self> {
         Ok(VaultSource {
             mount_path: url.host().unwrap().to_string(),
             secret_path: url.path().to_string(),
@@ -39,7 +40,7 @@ impl VaultSource {
 }
 
 impl super::Source for VaultSource {
-    fn read_secrets(&self) -> crate::Result<crate::secrets::Secrets> {
+    fn read_secrets(&self) -> Result<crate::secrets::Secrets> {
         eprintln!("Reading secrets from Vault at {}", self.url());
 
         let body = self
@@ -50,18 +51,20 @@ impl super::Source for VaultSource {
             .call()?
             .into_reader();
 
-        let body: SecretResponse = serde_json::from_reader(body)?;
+        let body: SecretResponse = serde_json::from_reader(body)
+            .with_context(|| "Unable to parse Vault server response")?;
         let secrets: Secrets = body.data.into();
 
         Ok(secrets)
     }
 
-    fn write_secrets(&self, secrets: &crate::secrets::Secrets) -> crate::Result<()> {
+    fn write_secrets(&self, secrets: &crate::secrets::Secrets) -> Result<()> {
         eprintln!("Writing secrets to Vault at {}", self.url());
 
         let body = serde_json::to_string(&SecretRequest {
             data: secrets.content.clone(),
-        })?;
+        })
+        .with_context(|| "Unable to encode server request")?;
 
         self.client
             .put(&self.url())
@@ -74,17 +77,18 @@ impl super::Source for VaultSource {
 }
 
 // Prioritize the VAULT_TOKEN environment variable. But fall back to reading from ~/.vault-token
-fn find_token() -> crate::Result<String> {
-    let token = match env::var("VAULT_TOKEN") {
-        Ok(token) => token,
-        Err(_) => {
+fn find_token() -> Result<String> {
+    env::var("VAULT_TOKEN")
+        .or_else(|_| {
             let mut path = dirs::home_dir().unwrap();
             path.push(".vault-token");
-            std::fs::read_to_string(path)?
-        }
-    };
-
-    Ok(token)
+            std::fs::read_to_string(path)
+        })
+        .or_else(|_| {
+            return Err(anyhow!(
+                "Unable to find token in $VAULT_TOKEN or ~/.vault-token"
+            ));
+        })
 }
 
 /// The shape of the response when fetching Secrets.

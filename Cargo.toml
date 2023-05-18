@@ -6,6 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+anyhow = "1.0.71"
 atty = "0.2"
 clap = { version = "4.2.7", features = ["derive"] }
 dirs = "5.0.1"

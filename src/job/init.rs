@@ -1,3 +1,4 @@
+use anyhow::{Context, Result};
 use std::io::Write;
 
 use super::Job;
@@ -10,17 +11,21 @@ pub struct InitJob {}
 
 impl Job for InitJob {
     /// Write the default config contents to the default config file.
-    fn run(&self) -> crate::Result<()> {
+    fn run(&self) -> Result<()> {
         let path = std::path::Path::new(DEFAULT_FILENAME);
         if path.exists() {
-            return Err(Box::new(std::io::Error::new(
+            return Err(std::io::Error::new(
                 std::io::ErrorKind::AlreadyExists,
                 format!("{} already exists", DEFAULT_FILENAME),
-            )));
+            )
+            .into());
         }
 
-        let mut file = std::fs::File::create(path)?;
-        file.write_all(DEFAULT_CONFIG)?;
+        let mut file =
+            std::fs::File::create(path).with_context(|| "Unable to create default config")?;
+
+        file.write_all(DEFAULT_CONFIG)
+            .with_context(|| "Unable to write default config")?;
 
         Ok(())
     }
