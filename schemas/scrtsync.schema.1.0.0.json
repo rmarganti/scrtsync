@@ -1,0 +1,36 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://raw.githubusercontent.com/rmarganti/scrtsync/main/schemas/scrtsync.schema.1.0.0.json",
+    "title": "SecretSync config",
+    "description": "A configuration file for SecretSync",
+    "type": "object",
+
+    "properties": {
+        "presets": {
+            "description": "Pre-configured pairs of origin and target sources",
+            "type": "object",
+            "patternProperties": {
+                "^.*$": {
+                    "$ref": "#/definitions/preset"
+                }
+            }
+        }
+    },
+
+    "definitions": {
+        "preset": {
+            "type": "object",
+            "properties": {
+                "from": {
+                    "description": "The origin source",
+                    "type": "string"
+                },
+                "to": {
+                    "description": "The target source",
+                    "type": "string"
+                }
+            },
+            "required": ["from", "to"]
+        }
+    }
+}
