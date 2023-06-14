@@ -1,5 +1,7 @@
 use anyhow::{Context, Result};
+use k8s_openapi::ByteString;
 use std::collections::BTreeMap;
+use std::str;
 
 #[derive(Debug)]
 pub struct Secrets {
@@ -18,8 +20,8 @@ impl Secrets {
     /// Read a buffer of dotenv-style `KEY="VALUE"` lines into a Secrets struct.
     pub fn from_reader<T: std::io::Read>(reader: &mut T) -> Result<Self> {
         let mut secrets = Self::new();
-
         let mut buffer = String::new();
+
         reader
             .read_to_string(&mut buffer)
             .with_context(|| "Unable to read secrets")?;
@@ -47,17 +49,26 @@ impl Secrets {
 }
 
 impl From<BTreeMap<String, String>> for Secrets {
-    // Create a Secrets from a BTreeMap
     fn from(map: BTreeMap<String, String>) -> Self {
         Self { content: map }
     }
 }
 
 impl From<&BTreeMap<String, String>> for Secrets {
-    // Create a Secrets from a BTreeMap
     fn from(map: &BTreeMap<String, String>) -> Self {
         Self {
             content: map.clone(),
+        }
+    }
+}
+
+impl From<BTreeMap<String, ByteString>> for Secrets {
+    fn from(map: BTreeMap<String, ByteString>) -> Self {
+        Self {
+            content: map
+                .into_iter()
+                .map(|(k, v)| (k, str::from_utf8(&v.0).unwrap().to_string()))
+                .collect(),
         }
     }
 }

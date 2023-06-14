@@ -1,26 +1,98 @@
 use crate::secrets::Secrets;
 use anyhow::Result;
+use k8s_openapi::api::core::v1::Secret as K8sSecret;
+use kube::{
+    api::{ObjectMeta, PostParams},
+    config::KubeConfigOptions,
+    Api,
+};
+use tokio::runtime::Runtime;
 
 pub struct K8sSource {
-    _context: String,
-    _secret_name: String,
+    api: Api<K8sSecret>,
+    runtime: Runtime,
+    secret_name: String,
 }
 
 impl K8sSource {
     pub fn new(url: &url::Url) -> Result<Self> {
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()?;
+
+        let context = url.host().unwrap().to_string();
+        let api = runtime.block_on(create_k8s_secrets_api(context))?;
+
         Ok(K8sSource {
-            _context: url.host().unwrap().to_string(),
-            _secret_name: url.path().to_string(),
+            api,
+            secret_name: url.path().trim_matches('/').to_string(),
+            runtime,
         })
     }
 }
 
 impl super::Source for K8sSource {
     fn read_secrets(&self) -> Result<crate::secrets::Secrets> {
-        Ok(Secrets::new())
+        eprintln!("Reading secrets from k8s secret {}", self.secret_name);
+
+        let body = self
+            .runtime
+            .block_on(self.api.get(self.secret_name.as_str()))?;
+
+        let data = body.data.unwrap();
+
+        Ok(Secrets::from(data))
     }
 
-    fn write_secrets(&self, _secrets: &crate::secrets::Secrets) -> Result<()> {
+    fn write_secrets(&self, secrets: &crate::secrets::Secrets) -> Result<()> {
+        eprintln!("Writing secrets to k8s secret {}", self.secret_name);
+
+        self.runtime.block_on(create_or_update_secrets(
+            &self.api,
+            &self.secret_name,
+            secrets,
+        ))?;
+
         Ok(())
     }
+}
+
+async fn create_k8s_secrets_api(context: String) -> Result<Api<K8sSecret>> {
+    let options = KubeConfigOptions {
+        context: Some(context),
+        ..KubeConfigOptions::default()
+    };
+
+    let config = kube::Config::from_kubeconfig(&options).await?;
+    let client = kube::Client::try_from(config)?;
+    let api: Api<K8sSecret> = Api::default_namespaced(client);
+
+    Ok(api)
+}
+
+async fn create_or_update_secrets(
+    api: &Api<K8sSecret>,
+    secret_name: &str,
+    secrets: &crate::secrets::Secrets,
+) -> Result<()> {
+    let payload = K8sSecret {
+        metadata: ObjectMeta {
+            name: Some(secret_name.to_string()),
+            ..ObjectMeta::default()
+        },
+        string_data: Some(secrets.content.clone()),
+        ..K8sSecret::default()
+    };
+
+    let existing_secret = api.get_opt(secret_name).await?;
+
+    match existing_secret {
+        Some(_) => {
+            api.replace(secret_name, &PostParams::default(), &payload)
+                .await?
+        }
+        None => api.create(&PostParams::default(), &payload).await?,
+    };
+
+    Ok(())
 }

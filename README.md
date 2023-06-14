@@ -23,6 +23,7 @@ The `--from` and `--to` options can be any of the following:
 -   `file://<path/to/your.env>` - Any .env file on your local file system.
 -   `vault://<secretMountPath>/<path/to/your/secrets>` - A vault secret path.
     Note that `secretMountPath` is usually "secret" for most default configurations.
+-   `k8s://<context>/<secretName>` - A Kubernetes secret.
 
 ## Using presets
 
