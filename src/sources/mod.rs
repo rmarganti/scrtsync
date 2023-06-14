@@ -2,7 +2,7 @@ use anyhow::{anyhow, Context, Result};
 use url::Url;
 
 mod file;
-// mod k8s;
+mod k8s;
 mod stdinout;
 mod vault;
 
@@ -19,7 +19,7 @@ impl dyn Source {
             "file" => Box::new(
                 file::FileSource::new(&url).with_context(|| "Could not build file source")?,
             ),
-            // "k8s" | "kubernetes" => Box::new(k8s::K8sSource::new(&url)?),
+            "k8s" | "kubernetes" => Box::new(k8s::K8sSource::new(&url)?),
             "std" => Box::new(
                 stdinout::StdInOutSource::new()
                     .with_context(|| "Could not build stdin/out source")?,
