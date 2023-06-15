@@ -29,9 +29,13 @@ impl Secrets {
         for line in buffer.lines() {
             let mut parts = line.split('=');
             let key = parts.next().unwrap();
-            let value = parts.next().unwrap().trim_matches('"');
 
-            secrets.content.insert(key.to_string(), value.to_string());
+            // Until we find a reason not too, treat all values as JSON strings.
+            // This allows us to handle escape characters for free.
+            let value = format!("\"{}\"", parts.next().unwrap().trim().trim_matches('"'));
+            let value = serde_json::from_str(&value).with_context(|| "Unable to parse env value")?;
+
+            secrets.content.insert(key.to_string(), value);
         }
 
         Ok(secrets)
@@ -40,7 +44,13 @@ impl Secrets {
     /// Write secrets as dotenv-style `KEY="VALUE"` lines
     pub fn to_writer<T: std::io::Write>(&self, buf: &mut T) -> Result<()> {
         for (key, value) in &self.content {
-            buf.write(format!("{}=\"{}\"\n", key, value).as_bytes())
+            let line = format!(
+                "{}={}\n",
+                key,
+                serde_json::to_string(value).with_context(|| "Unable to encode env value")?
+            );
+
+            buf.write(line.as_bytes())
                 .with_context(|| "Unable to write secrets")?;
         }
 
@@ -112,7 +122,7 @@ mod tests {
     }
 
     #[test]
-    fn to_env() {
+    fn to_writer() {
         let mut map = BTreeMap::new();
         map.insert("foo".to_string(), "bar".to_string());
         map.insert("baz".to_string(), "qux".to_string());
