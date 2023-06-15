@@ -27,13 +27,29 @@ impl Secrets {
             .with_context(|| "Unable to read secrets")?;
 
         for line in buffer.lines() {
-            let mut parts = line.split('=');
-            let key = parts.next().unwrap();
+            // Ignore comments
+            let mut parts = line.split('#');
+            let line_body = parts.next().unwrap().trim();
+
+            if line_body.is_empty() {
+                continue;
+            }
+
+            let mut parts = line_body.split('=');
+            let key = parts.next().unwrap().trim();
+            let mut value = parts.next().unwrap().trim().to_string();
+
+            // Treat everything as a string.
+            if !value.starts_with('"') {
+                value = format!("\"{}\"", value);
+            }
 
             // Until we find a reason not too, treat all values as JSON strings.
             // This allows us to handle escape characters for free.
-            let value = format!("\"{}\"", parts.next().unwrap().trim().trim_matches('"'));
-            let value = serde_json::from_str(&value).with_context(|| "Unable to parse env value")?;
+            let value =
+                serde_json::from_str(&value).with_context(|| "Unable to parse env value")?;
+
+            eprintln!("Key: {:?}, Value: {:?}", key, value);
 
             secrets.content.insert(key.to_string(), value);
         }
@@ -47,6 +63,7 @@ impl Secrets {
             let line = format!(
                 "{}={}\n",
                 key,
+                // JSON-encoding is a convenient way to escape characters.
                 serde_json::to_string(value).with_context(|| "Unable to encode env value")?
             );
 
@@ -136,5 +153,24 @@ mod tests {
         let expected = "baz=\"qux\"\nfoo=\"bar\"\n";
 
         assert_eq!(secret_string, expected);
+    }
+
+    #[test]
+    fn handle_comments_and_white_space() {
+        let mut expected = BTreeMap::new();
+        expected.insert("foo".to_string(), "bar".to_string());
+        expected.insert("baz".to_string(), "qux".to_string());
+
+        let input = r#"
+            # This is a comment
+            baz="qux"
+
+            foo="bar" # This is another comment
+            "#;
+
+        let mut buf = input.as_bytes();
+        let result = Secrets::from_reader(&mut buf).unwrap();
+
+        assert_eq!(expected, result.content);
     }
 }
