@@ -1,7 +1,6 @@
 use anyhow::{Context, Result};
 use clap::Parser;
 use serde::Deserialize;
-use serde_json;
 use std::{collections::HashMap, fs, io, path};
 
 const DEFAULT_CONFIG: &str = ".scrtsync.json";
