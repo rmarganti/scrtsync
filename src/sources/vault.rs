@@ -1,6 +1,5 @@
 use crate::secrets::Secrets;
 use anyhow::{anyhow, Context, Result};
-use dirs;
 use serde::Deserialize;
 use serde::Serialize;
 use serde_json::Value;
@@ -84,15 +83,15 @@ fn find_token() -> Result<String> {
             path.push(".vault-token");
             std::fs::read_to_string(path)
         })
-        .or_else(|_| {
-            return Err(anyhow!(
+        .map_err(|_| {
+            anyhow!(
                 "Unable to find token in $VAULT_TOKEN or ~/.vault-token"
-            ));
+            )
         })
 }
 
 /// The shape of the response when fetching Secrets.
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SecretResponse {
     #[serde(rename = "request_id")]
@@ -110,7 +109,7 @@ pub struct SecretResponse {
 }
 
 /// The shape of the request when storing Secrets.
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SecretRequest {
     pub data: BTreeMap<String, String>,

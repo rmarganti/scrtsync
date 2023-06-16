@@ -1,6 +1,5 @@
 use crate::sources::Source;
 use anyhow::Result;
-use atty;
 use std::error;
 use std::fmt;
 
@@ -21,7 +20,7 @@ pub fn new_job(
         return Ok(Box::new(init::InitJob {}));
     }
 
-    let preset_cfg = preset.as_ref().map(|p| config.presets.get(p)).flatten();
+    let preset_cfg = preset.as_ref().and_then(|p| config.presets.get(p));
 
     let from = if atty::is(atty::Stream::Stdin) {
         from
@@ -31,10 +30,10 @@ pub fn new_job(
     };
 
     let from = from // stdin (when piping) and `--from` take precedent
-        .or(preset_cfg.map(|p| p.from.clone())) // Then see if a preset was specified
+        .or_else(|| preset_cfg.map(|p| p.from.clone()))
         .map(|uri| <dyn Source>::new(&uri)) // Build the Source
         .unwrap_or_else(|| {
-            return Err(NoSourceProvidedError::new("from").into());
+            Err(NoSourceProvidedError::new("from").into())
         })?;
 
     let to = if atty::is(atty::Stream::Stdout) {
@@ -45,13 +44,13 @@ pub fn new_job(
     };
 
     let to = to // stdout (when piping) and `--to` take precedent
-        .or(preset_cfg.map(|p| p.to.clone())) // Then see if a preset was specified
+        .or_else(|| preset_cfg.map(|p| p.to.clone()))
         .map(|uri| <dyn Source>::new(&uri)) // Build the Source
         .unwrap_or_else(|| {
-            return Err(NoSourceProvidedError::new("to").into());
+            Err(NoSourceProvidedError::new("to").into())
         })?;
 
-    return Ok(Box::new(sync::SyncJob::new(from, to)));
+    Ok(Box::new(sync::SyncJob::new(from, to)))
 }
 
 #[derive(Debug, Clone)]
@@ -69,7 +68,7 @@ impl fmt::Display for NoSourceProvidedError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "unable to determine source, provide either `--{}` or a preset\n",
+            "unable to determine source, provide either `--{}` or a preset",
             self.field,
         )
     }
