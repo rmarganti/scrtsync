@@ -83,11 +83,7 @@ fn find_token() -> Result<String> {
             path.push(".vault-token");
             std::fs::read_to_string(path)
         })
-        .map_err(|_| {
-            anyhow!(
-                "Unable to find token in $VAULT_TOKEN or ~/.vault-token"
-            )
-        })
+        .map_err(|_| anyhow!("Unable to find token in $VAULT_TOKEN or ~/.vault-token"))
 }
 
 /// The shape of the response when fetching Secrets.

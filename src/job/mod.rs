@@ -32,9 +32,7 @@ pub fn new_job(
     let from = from // stdin (when piping) and `--from` take precedent
         .or_else(|| preset_cfg.map(|p| p.from.clone()))
         .map(|uri| <dyn Source>::new(&uri)) // Build the Source
-        .unwrap_or_else(|| {
-            Err(NoSourceProvidedError::new("from").into())
-        })?;
+        .unwrap_or_else(|| Err(NoSourceProvidedError::new("from").into()))?;
 
     let to = if atty::is(atty::Stream::Stdout) {
         to
@@ -46,9 +44,7 @@ pub fn new_job(
     let to = to // stdout (when piping) and `--to` take precedent
         .or_else(|| preset_cfg.map(|p| p.to.clone()))
         .map(|uri| <dyn Source>::new(&uri)) // Build the Source
-        .unwrap_or_else(|| {
-            Err(NoSourceProvidedError::new("to").into())
-        })?;
+        .unwrap_or_else(|| Err(NoSourceProvidedError::new("to").into()))?;
 
     Ok(Box::new(sync::SyncJob::new(from, to)))
 }
