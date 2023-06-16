@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.1.1](https://github.com/rmarganti/scrtsync/compare/v1.1.0...v1.1.1) (2023-06-16)
+
+
+### Bug Fixes
+
+* remove debug logging ([#4](https://github.com/rmarganti/scrtsync/issues/4)) ([3d1ca54](https://github.com/rmarganti/scrtsync/commit/3d1ca54b509c7fbc4c681f39a37f2fff736f0324))
+
 ## 1.1.0 (2023-06-16)
 
 
