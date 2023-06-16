@@ -1,0 +1,18 @@
+name: Prepare Release
+on:
+  workflow_dispatch:
+
+jobs:
+  standard-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup node
+        uses: actions/setup-node@v3
+        with:
+          node-version: "18"
+          cache: "npm"
+          cache-dependency-path: "**/.github/workflows/*.yml"
+      - name: Build changelog and tag release
+        run: npx standard-release
+      - name: Push to repo
+        run: git push && git push --tags
