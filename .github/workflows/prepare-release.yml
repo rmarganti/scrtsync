@@ -13,6 +13,6 @@ jobs:
           cache: "npm"
           cache-dependency-path: "**/.github/workflows/*.yml"
       - name: Build changelog and tag release
-        run: npx standard-release
+        run: npx standard-version
       - name: Push to repo
         run: git push && git push --tags
