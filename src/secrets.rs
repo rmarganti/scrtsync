@@ -49,8 +49,6 @@ impl Secrets {
             let value =
                 serde_json::from_str(&value).with_context(|| "Unable to parse env value")?;
 
-            eprintln!("Key: {:?}, Value: {:?}", key, value);
-
             secrets.content.insert(key.to_string(), value);
         }
 
