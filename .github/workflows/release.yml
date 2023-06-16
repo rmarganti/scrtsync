@@ -162,7 +162,7 @@ jobs:
             - name: Upload binaries to release
               uses: svenstaro/upload-release-action@v2
               with:
-                  repo_token: ${{ secrets.GITHUB_TOKEN }}
+                  repo_token: ${{ secrets.COMMITTER_TOKEN }}
                   file: dist/*
                   file_glob: true
                   tag: ${{ steps.tagname.outputs.val }}
@@ -181,21 +181,6 @@ jobs:
                   commit-message: updating formula for ${{ env.PROJECT_NAME }}
               env:
                   COMMITTER_TOKEN: ${{ secrets.COMMITTER_TOKEN }}
-              #
-              # you can use this initial file in your homebrew-tap if you don't have an initial formula:
-              # <projectname>.rb
-              #
-              # class <Projectname capitalized> < Formula
-              #   desc "A test formula"
-              #   homepage "http://www.example.com"
-              #   url "-----"
-              #   version "-----"
-              #   sha256 "-----"
-
-              #   def install
-              #     bin.install "<bin-name>"
-              #   end
-              # end
 
             # Uncomment this section if you want to release your package to crates.io
             # Before publishing, make sure you have filled out the following fields:
