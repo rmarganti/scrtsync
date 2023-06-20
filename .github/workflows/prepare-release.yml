@@ -18,11 +18,14 @@ jobs:
           cache: "npm"
           cache-dependency-path: "**/.github/workflows/*.yml"
 
+      - uses: oleksiyrudenko/gha-git-credentials@v2-latest
+        with:
+          name: "SecretSync CI Bot"
+          email: "bot@scrtsync.com"
+          token: "${{ secrets.GITHUB_TOKEN }}"
+
       - name: Build changelog and tag release
-        run: |
-          git config --global user.email "bot@scrtsync.com"
-          git config --global user.name "SecretSync CI Bot"
-          npx --yes standard-version
+        run: npx --yes standard-version
 
       - name: Push to repo
         run: git push && git push --tags
