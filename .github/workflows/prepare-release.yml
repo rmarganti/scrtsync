@@ -6,13 +6,26 @@ jobs:
   standard-release:
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
       - name: Setup node
         uses: actions/setup-node@v3
         with:
           node-version: "18"
           cache: "npm"
           cache-dependency-path: "**/.github/workflows/*.yml"
+
+      - uses: oleksiyrudenko/gha-git-credentials@v2-latest
+        with:
+          name: "SecretSync CI Bot"
+          email: "bot@scrtsync.com"
+          token: "${{ secrets.GITHUB_TOKEN }}"
+
       - name: Build changelog and tag release
-        run: npx standard-version
+        run: npx --yes standard-version
+
       - name: Push to repo
         run: git push && git push --tags

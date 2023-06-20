@@ -53,10 +53,8 @@ jobs:
           #   target: i686-pc-windows-msvc
 
     steps:
-      - name: Checkout sources
-        uses: actions/checkout@v2
-        with:
-          submodules: true
+      - name: Checkout repository
+        uses: actions/checkout@v3
 
       - name: Install ${{ matrix.rust }} toolchain
         uses: actions-rs/toolchain@v1
