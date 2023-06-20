@@ -19,7 +19,10 @@ jobs:
           cache-dependency-path: "**/.github/workflows/*.yml"
 
       - name: Build changelog and tag release
-        run: npx --yes standard-version
+        run: |
+          git config --global user.email "bot@scrtsync.com"
+          git config --global user.name "SecretSync CI Bot"
+          npx --yes standard-version
 
       - name: Push to repo
         run: git push && git push --tags
