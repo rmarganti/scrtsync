@@ -35,7 +35,7 @@ impl Secrets {
                 continue;
             }
 
-            let mut parts = line_body.split('=');
+            let mut parts = line_body.splitn(2, '=');
             let key = parts.next().unwrap().trim();
             let mut value = parts.next().unwrap().trim().to_string();
 
