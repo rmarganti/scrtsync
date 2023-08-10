@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.2.0](https://github.com/rmarganti/scrtsync/compare/v1.1.2...v1.2.0) (2023-08-10)
+
+
+### Features
+
+* better env parsing ([4dc594d](https://github.com/rmarganti/scrtsync/commit/4dc594d554bfdd2fe149362cab8b7e1c315d31a8))
+
+
+### Bug Fixes
+
+* no data prop for Vault secret write ([ae52937](https://github.com/rmarganti/scrtsync/commit/ae52937529168484ad0bc080fcf769948471b2d3))
+
 ### [1.1.2](https://github.com/rmarganti/scrtsync/compare/v1.1.1...v1.1.2) (2023-08-10)
 
 
