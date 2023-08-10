@@ -12,6 +12,7 @@ anyhow = "1.0.71"
 atty = "0.2"
 clap = { version = "4.2.7", features = ["derive"] }
 dirs = "5.0.1"
+dotenvy = "0.15.7"
 k8s-openapi = { version = "0.18.0", features = ["v1_26"] }
 kube = { version = "0.83.0", features = ["runtime", "derive"] }
 openssl-sys = { version = "0.9", features = ["vendored"] }

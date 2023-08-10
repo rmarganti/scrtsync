@@ -20,36 +20,11 @@ impl Secrets {
     /// Read a buffer of dotenv-style `KEY="VALUE"` lines into a Secrets struct.
     pub fn from_reader<T: std::io::Read>(reader: &mut T) -> Result<Self> {
         let mut secrets = Self::new();
-        let mut buffer = String::new();
+        let iter = dotenvy::Iter::new(reader);
 
-        reader
-            .read_to_string(&mut buffer)
-            .with_context(|| "Unable to read secrets")?;
-
-        for line in buffer.lines() {
-            // Ignore comments
-            let mut parts = line.split('#');
-            let line_body = parts.next().unwrap().trim();
-
-            if line_body.is_empty() {
-                continue;
-            }
-
-            let mut parts = line_body.splitn(2, '=');
-            let key = parts.next().unwrap().trim();
-            let mut value = parts.next().unwrap().trim().to_string();
-
-            // Treat everything as a string.
-            if !value.starts_with('"') {
-                value = format!("\"{}\"", value);
-            }
-
-            // Until we find a reason not too, treat all values as JSON strings.
-            // This allows us to handle escape characters for free.
-            let value =
-                serde_json::from_str(&value).with_context(|| "Unable to parse env value")?;
-
-            secrets.content.insert(key.to_string(), value);
+        for item in iter {
+            let (key, value) = item.with_context(|| "Unable to decode env value")?;
+            secrets.content.insert(key, value);
         }
 
         Ok(secrets)
@@ -127,9 +102,14 @@ mod tests {
     fn from_reader() {
         let mut expected = BTreeMap::new();
         expected.insert("foo".to_string(), "bar".to_string());
-        expected.insert("baz".to_string(), "qux".to_string());
+        expected.insert("baz".to_string(), "qu#x".to_string());
 
-        let input = "baz=\"qux\"\nfoo=\"bar\"\n";
+        let input = "
+            # single line comment
+            baz=\"qu#x\" # inline comment
+            foo=\"bar\"\n
+        ";
+
         let mut buf = input.as_bytes();
         let result = Secrets::from_reader(&mut buf).unwrap();
 
