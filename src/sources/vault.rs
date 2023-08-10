@@ -60,10 +60,8 @@ impl super::Source for VaultSource {
     fn write_secrets(&self, secrets: &crate::secrets::Secrets) -> Result<()> {
         eprintln!("Writing secrets to Vault at {}", self.url());
 
-        let body = serde_json::to_string(&SecretRequest {
-            data: secrets.content.clone(),
-        })
-        .with_context(|| "Unable to encode server request")?;
+        let body = serde_json::to_string(&secrets.content)
+            .with_context(|| "Unable to encode server request")?;
 
         self.client
             .put(&self.url())
@@ -102,11 +100,4 @@ pub struct SecretResponse {
     pub wrap_info: Value,
     pub warnings: Value,
     pub auth: Value,
-}
-
-/// The shape of the request when storing Secrets.
-#[derive(Default, Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct SecretRequest {
-    pub data: BTreeMap<String, String>,
 }
