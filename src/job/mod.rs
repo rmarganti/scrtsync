@@ -1,9 +1,9 @@
-use std::io;
-use std::io::IsTerminal;
 use crate::sources::Source;
 use anyhow::Result;
 use std::error;
 use std::fmt;
+use std::io;
+use std::io::IsTerminal;
 
 mod init;
 mod sync;
