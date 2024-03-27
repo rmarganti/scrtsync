@@ -9,7 +9,6 @@ path = "src/main.rs"
 
 [dependencies]
 anyhow = "1.0.71"
-atty = "0.2"
 clap = { version = "4.2.7", features = ["derive"] }
 dirs = "5.0.1"
 dotenvy = "0.15.7"

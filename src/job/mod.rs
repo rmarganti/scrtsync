@@ -1,3 +1,5 @@
+use std::io;
+use std::io::IsTerminal;
 use crate::sources::Source;
 use anyhow::Result;
 use std::error;
@@ -22,7 +24,7 @@ pub fn new_job(
 
     let preset_cfg = preset.as_ref().and_then(|p| config.presets.get(p));
 
-    let from = if atty::is(atty::Stream::Stdin) {
+    let from = if io::stdin().is_terminal() {
         from
     } else {
         // Use stdin if piping in
@@ -34,7 +36,7 @@ pub fn new_job(
         .map(|uri| <dyn Source>::new(&uri)) // Build the Source
         .unwrap_or_else(|| Err(NoSourceProvidedError::new("from").into()))?;
 
-    let to = if atty::is(atty::Stream::Stdout) {
+    let to = if io::stdout().is_terminal() {
         to
     } else {
         // Use stdin if piping out
