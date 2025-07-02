@@ -8,12 +8,12 @@ mod secrets;
 mod sources;
 
 fn main() -> Result<()> {
-    do_main()
-}
-
-fn do_main() -> Result<()> {
     let args = Args::parse();
-    let cfg = Config::from_file(&args.config).with_context(|| "Could not build config object")?;
+    let cfg = Config::from_file(&args.config)
+        .with_context(|| format!("Failed to load config from '{}'", args.config))?;
+
+    args.validate(&cfg)
+        .with_context(|| "Invalid command line arguments")?;
 
     let job = job::new_job(&cfg, args.from, args.to, args.preset)
         .with_context(|| "Could not build job")?;
