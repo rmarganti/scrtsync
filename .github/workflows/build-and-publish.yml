@@ -1,8 +1,7 @@
 name: Build and Publish
 on:
-  push:
-    tags:
-      - "v[0-9]+.[0-9]+.[0-9]+"
+  release:
+    types: [published]
 
 env:
   BIN_NAME: scrtsync
@@ -122,12 +121,8 @@ jobs:
       - name: Calculate tag name
         id: tagname
         run: |
-          name=dev
-          if [[ $GITHUB_REF == refs/tags/v* ]]; then
-            name=${GITHUB_REF:10}
-          fi
-          echo "val=$name" >> $GITHUB_OUTPUT
-          echo TAG=$name >> $GITHUB_ENV
+          echo "val=${{ github.event.release.tag_name }}" >> $GITHUB_OUTPUT
+          echo TAG=${{ github.event.release.tag_name }} >> $GITHUB_ENV
 
       - name: Build archive
         shell: bash

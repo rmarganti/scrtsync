@@ -29,3 +29,17 @@ jobs:
 
       - name: Push to repo
         run: git push && git push --tags
+
+      - name: Extract tag name
+        id: extract_tag
+        run: |
+          echo "tag=$(git describe --tags --abbrev=0)" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.extract_tag.outputs.tag }}
+          name: Release ${{ steps.extract_tag.outputs.tag }}
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
