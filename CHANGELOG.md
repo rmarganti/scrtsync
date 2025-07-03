@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.3.0](https://github.com/rmarganti/scrtsync/compare/v1.2.0...v1.3.0) (2025-07-03)
+
+
+### Features
+
+* additional config & arg validation ([c5c478e](https://github.com/rmarganti/scrtsync/commit/c5c478eebacb898323cf4af9e70b3f5c23f631a5))
+* replace atty with std::io::IsTerminal ([c486131](https://github.com/rmarganti/scrtsync/commit/c4861313ad8563eb1da077803a8287e9c9495a52))
+
 ## [1.2.0](https://github.com/rmarganti/scrtsync/compare/v1.1.2...v1.2.0) (2023-08-10)
 
 
