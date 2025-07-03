@@ -16,7 +16,7 @@ impl Job for InitJob {
         if path.exists() {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::AlreadyExists,
-                format!("{} already exists", DEFAULT_FILENAME),
+                format!("{DEFAULT_FILENAME} already exists"),
             )
             .into());
         }

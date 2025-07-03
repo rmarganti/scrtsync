@@ -16,8 +16,19 @@ pub struct VaultSource {
 
 impl VaultSource {
     pub fn new(url: &url::Url) -> Result<Self> {
+        let host = url
+            .host()
+            .ok_or_else(|| anyhow!("Vault URL missing host"))?;
+
+        let mount_path = host.to_string();
+
+        // Validate that the mount path is not empty after conversion
+        if mount_path.is_empty() {
+            return Err(anyhow!("Vault URL host cannot be empty"));
+        }
+
         Ok(VaultSource {
-            mount_path: url.host().unwrap().to_string(),
+            mount_path,
             secret_path: url.path().to_string(),
             client: AgentBuilder::new()
                 .timeout_read(std::time::Duration::from_secs(5))
@@ -28,23 +39,24 @@ impl VaultSource {
     }
 
     // Generate the full URL to read and write secrets.
-    fn url(&self) -> String {
-        format!(
+    fn url(&self) -> Result<String> {
+        Ok(format!(
             "{}/v1/{}{}",
-            env::var("VAULT_ADDR").unwrap(),
+            env::var("VAULT_ADDR").with_context(|| "VAULT_ADDR environment variable not set")?,
             self.mount_path,
             self.secret_path
-        )
+        ))
     }
 }
 
 impl super::Source for VaultSource {
     fn read_secrets(&self) -> Result<crate::secrets::Secrets> {
-        eprintln!("Reading secrets from Vault at {}", self.url());
+        let url = self.url()?;
+        eprintln!("Reading secrets from Vault at {url}");
 
         let body = self
             .client
-            .get(&self.url())
+            .get(&url)
             .set("Content-Type", "application/json")
             .set("X-Vault-Token", &self.token)
             .call()?
@@ -58,13 +70,14 @@ impl super::Source for VaultSource {
     }
 
     fn write_secrets(&self, secrets: &crate::secrets::Secrets) -> Result<()> {
-        eprintln!("Writing secrets to Vault at {}", self.url());
+        let url = self.url()?;
+        eprintln!("Writing secrets to Vault at {url}");
 
         let body = serde_json::to_string(&secrets.content)
             .with_context(|| "Unable to encode server request")?;
 
         self.client
-            .put(&self.url())
+            .put(&url)
             .set("X-Vault-Token", &self.token)
             .set("Content-Type", "application/json")
             .send_string(&body)?;
@@ -75,13 +88,17 @@ impl super::Source for VaultSource {
 
 // Prioritize the VAULT_TOKEN environment variable. But fall back to reading from ~/.vault-token
 fn find_token() -> Result<String> {
-    env::var("VAULT_TOKEN")
-        .or_else(|_| {
-            let mut path = dirs::home_dir().unwrap();
-            path.push(".vault-token");
-            std::fs::read_to_string(path)
-        })
-        .map_err(|_| anyhow!("Unable to find token in $VAULT_TOKEN or ~/.vault-token"))
+    if let Ok(token) = env::var("VAULT_TOKEN") {
+        return Ok(token);
+    }
+
+    let home_dir = dirs::home_dir()
+        .ok_or_else(|| anyhow!("Could not determine home directory for ~/.vault-token"))?;
+    let token_path = home_dir.join(".vault-token");
+    let token = std::fs::read_to_string(&token_path)
+        .with_context(|| format!("Unable to read token from {}", token_path.display()))?;
+
+    Ok(token.trim().to_string())
 }
 
 /// The shape of the response when fetching Secrets.

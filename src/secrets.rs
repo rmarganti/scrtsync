@@ -62,14 +62,20 @@ impl From<&BTreeMap<String, String>> for Secrets {
     }
 }
 
-impl From<BTreeMap<String, ByteString>> for Secrets {
-    fn from(map: BTreeMap<String, ByteString>) -> Self {
-        Self {
-            content: map
-                .into_iter()
-                .map(|(k, v)| (k, str::from_utf8(&v.0).unwrap().to_string()))
-                .collect(),
+impl TryFrom<BTreeMap<String, ByteString>> for Secrets {
+    type Error = anyhow::Error;
+
+    fn try_from(map: BTreeMap<String, ByteString>) -> Result<Self, Self::Error> {
+        let mut content = BTreeMap::new();
+
+        for (key, value) in map {
+            let string_value = str::from_utf8(&value.0)
+                .with_context(|| format!("Unable to decode UTF-8 value for key '{key}'"))?
+                .to_string();
+            content.insert(key, string_value);
         }
+
+        Ok(Self { content })
     }
 }
 
@@ -150,5 +156,38 @@ mod tests {
         let result = Secrets::from_reader(&mut buf).unwrap();
 
         assert_eq!(expected, result.content);
+    }
+
+    #[test]
+    fn try_from_btreemap_bytestring_valid() {
+        use k8s_openapi::ByteString;
+
+        let mut map = BTreeMap::new();
+        map.insert("foo".to_string(), ByteString("bar".as_bytes().to_vec()));
+        map.insert("baz".to_string(), ByteString("qux".as_bytes().to_vec()));
+
+        let secrets = Secrets::try_from(map).unwrap();
+
+        let mut expected = BTreeMap::new();
+        expected.insert("foo".to_string(), "bar".to_string());
+        expected.insert("baz".to_string(), "qux".to_string());
+
+        assert_eq!(secrets.content, expected);
+    }
+
+    #[test]
+    fn try_from_btreemap_bytestring_invalid_utf8() {
+        use k8s_openapi::ByteString;
+
+        let mut map = BTreeMap::new();
+        map.insert("foo".to_string(), ByteString("bar".as_bytes().to_vec()));
+        // Invalid UTF-8 sequence
+        map.insert("invalid".to_string(), ByteString(vec![0xff, 0xfe, 0xfd]));
+
+        let result = Secrets::try_from(map);
+        assert!(result.is_err());
+
+        let error_message = result.unwrap_err().to_string();
+        assert!(error_message.contains("Unable to decode UTF-8 value for key 'invalid'"));
     }
 }

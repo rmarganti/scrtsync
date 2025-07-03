@@ -1,5 +1,5 @@
 use crate::secrets::Secrets;
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use k8s_openapi::api::core::v1::Secret as K8sSecret;
 use kube::{
     api::{ObjectMeta, PostParams},
@@ -20,7 +20,17 @@ impl K8sSource {
             .enable_all()
             .build()?;
 
-        let context = url.host().unwrap().to_string();
+        let host = url
+            .host()
+            .ok_or_else(|| anyhow::anyhow!("URL missing host for Kubernetes context"))?;
+
+        let context = host.to_string();
+
+        // Validate that the context is not empty after conversion
+        if context.is_empty() {
+            return Err(anyhow::anyhow!("Kubernetes context cannot be empty"));
+        }
+
         let api = runtime.block_on(create_k8s_secrets_api(context))?;
 
         Ok(K8sSource {
@@ -39,9 +49,9 @@ impl super::Source for K8sSource {
             .runtime
             .block_on(self.api.get(self.secret_name.as_str()))?;
 
-        let data = body.data.unwrap();
+        let data = body.data.ok_or_else(|| anyhow!("Secret data not found"))?;
 
-        Ok(Secrets::from(data))
+        Secrets::try_from(data)
     }
 
     fn write_secrets(&self, secrets: &crate::secrets::Secrets) -> Result<()> {
