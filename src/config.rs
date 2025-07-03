@@ -8,7 +8,6 @@ const DEFAULT_CONFIG: &str = ".scrtsync.json";
 /// Synchronize secrets between different sources
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
-
 pub struct Args {
     /// Config file to use for presets
     #[arg(short, long, default_value_t = String::from(DEFAULT_CONFIG))]
@@ -85,9 +84,9 @@ impl Config {
         for (name, preset) in &self.presets {
             // Validate that source URLs are parseable
             url::Url::parse(&preset.from)
-                .with_context(|| format!("Invalid 'from' URL in preset '{}'", name))?;
+                .with_context(|| format!("Invalid `from` URL in preset '{name}'"))?;
             url::Url::parse(&preset.to)
-                .with_context(|| format!("Invalid 'to' URL in preset '{}'", name))?;
+                .with_context(|| format!("Invalid `to` URL in preset '{name}'"))?;
         }
         Ok(())
     }
