@@ -2,6 +2,11 @@ name: Build and Publish
 on:
   release:
     types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version (e.g., v1.2.3)"
+        required: true
 
 env:
   BIN_NAME: scrtsync
@@ -121,8 +126,13 @@ jobs:
       - name: Calculate tag name
         id: tagname
         run: |
-          echo "val=${{ github.event.release.tag_name }}" >> $GITHUB_OUTPUT
-          echo TAG=${{ github.event.release.tag_name }} >> $GITHUB_ENV
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "val=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+            echo TAG=${{ github.event.inputs.version }} >> $GITHUB_ENV
+          else
+            echo "val=${{ github.event.release.tag_name }}" >> $GITHUB_OUTPUT
+            echo TAG=${{ github.event.release.tag_name }} >> $GITHUB_ENV
+          fi
 
       - name: Build archive
         shell: bash
