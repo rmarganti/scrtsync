@@ -123,15 +123,22 @@ jobs:
       - uses: actions/download-artifact@v4.1.7
       - run: ls -al bins-*
 
-      - name: Calculate tag name
-        id: tagname
+      # Extract the tag name for both release and manual triggers.
+      # For manual triggers, validate that the input starts with 'v' (e.g., v1.2.3).
+      - name: Extract version
+        id: extract-version
         run: |
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            echo "val=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+            if [[ ! "${{ github.event.inputs.version }}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              echo "Error: version input must start with 'v' and follow semantic versioning (e.g., v1.2.3)"
+              exit 1
+            fi
+            echo "tag-name=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
             echo TAG=${{ github.event.inputs.version }} >> $GITHUB_ENV
           else
-            echo "val=${{ github.event.release.tag_name }}" >> $GITHUB_OUTPUT
-            echo TAG=${{ github.event.release.tag_name }} >> $GITHUB_ENV
+            # Remove refs/tags/ prefix to get the tag name
+            echo "tag-name=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+            echo TAG=${GITHUB_REF#refs/tags/} >> $GITHUB_ENV
           fi
 
       - name: Build archive
@@ -168,13 +175,8 @@ jobs:
           repo_token: ${{ secrets.COMMITTER_TOKEN }}
           file: dist/*
           file_glob: true
-          tag: ${{ steps.tagname.outputs.val }}
+          tag: ${{ steps.extract-version.outputs.tag-name }}
           overwrite: true
-
-      - name: Extract version
-        id: extract-version
-        run: |
-          echo "tag-name=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
 
       - uses: mislav/bump-homebrew-formula-action@v3
         with:
