@@ -54,7 +54,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Install ${{ matrix.rust }} toolchain
         uses: actions-rs/toolchain@v1
@@ -101,7 +101,7 @@ jobs:
             cp "target/${{ matrix.target }}/release/$BIN_NAME" "dist/"
           fi
 
-      - uses: actions/upload-artifact@v2.2.4
+      - uses: actions/upload-artifact@v4
         with:
           name: bins-${{ matrix.build }}
           path: dist
@@ -112,7 +112,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           submodules: false
 
@@ -120,14 +120,14 @@ jobs:
       - run: ls -al bins-*
 
       - name: Calculate tag name
+        id: tagname
         run: |
           name=dev
           if [[ $GITHUB_REF == refs/tags/v* ]]; then
             name=${GITHUB_REF:10}
           fi
-          echo ::set-output name=val::$name
+          echo "val=$name" >> $GITHUB_OUTPUT
           echo TAG=$name >> $GITHUB_ENV
-        id: tagname
 
       - name: Build archive
         shell: bash
@@ -169,9 +169,9 @@ jobs:
       - name: Extract version
         id: extract-version
         run: |
-          printf "::set-output name=%s::%s\n" tag-name "${GITHUB_REF#refs/tags/}"
+          echo "tag-name=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
 
-      - uses: mislav/bump-homebrew-formula-action@v1
+      - uses: mislav/bump-homebrew-formula-action@v3
         with:
           formula-path: ${{env.PROJECT_NAME}}.rb
           homebrew-tap: ${{ env.BREW_TAP }}
