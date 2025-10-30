@@ -4,12 +4,12 @@ Sync secrets between [Vault](https://www.vaultproject.io/) and a local `.env`.
 
 ## Installation
 
--   Binaries can be downloaded from the [releases page](https://github.com/rmarganti/scrtsync/releases).
--   Mac users can install via Homebrew:
+- Binaries can be downloaded from the [releases page](https://github.com/rmarganti/scrtsync/releases).
+- Mac users can install via Homebrew:
 
     ```sh
     brew tap rmarganti/tap
-    brew install scrtsync
+    brew install secret-sync
     ```
 
 ## Syncing secrets between sources
@@ -20,10 +20,10 @@ scrtsync --from vault://secrets/you/secret/path --to file://.env
 
 The `--from` and `--to` options can be any of the following:
 
--   `file://<path/to/your.env>` - Any .env file on your local file system.
--   `vault://<secretMountPath>/<path/to/your/secrets>` - A vault secret path.
-    Note that `secretMountPath` is usually "secret" for most default configurations.
--   `k8s://<context>/<secretName>` - A Kubernetes secret.
+- `file://<path/to/your.env>` - Any .env file on your local file system.
+- `vault://<secretMountPath>/<path/to/your/secrets>` - A vault secret path.
+  Note that `secretMountPath` is usually "secret" for most default configurations.
+- `k8s://<context>/<secretName>` - A Kubernetes secret.
 
 ## Using presets
 
