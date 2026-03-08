@@ -1,11 +1,33 @@
 use crate::secrets::Secrets;
-use anyhow::{anyhow, Context, Result};
+use anyhow::Result;
 use serde::Deserialize;
 use serde::Serialize;
 use serde_json::Value;
 use std::collections::BTreeMap;
 use std::env;
 use ureq::{Agent, AgentBuilder};
+
+#[derive(Debug, thiserror::Error)]
+pub enum VaultSourceError {
+    #[error("Vault URL missing host")]
+    MissingHost,
+
+    #[error("Vault URL host cannot be empty")]
+    EmptyHost,
+
+    #[error("VAULT_ADDR environment variable not set")]
+    MissingVaultAddr,
+
+    #[error("could not determine home directory for ~/.vault-token")]
+    NoHomeDir,
+
+    #[error("unable to read token from {path}")]
+    ReadToken {
+        path: String,
+        #[source]
+        source: std::io::Error,
+    },
+}
 
 pub struct VaultSource {
     client: Agent,
@@ -15,16 +37,12 @@ pub struct VaultSource {
 }
 
 impl VaultSource {
-    pub fn new(url: &url::Url) -> Result<Self> {
-        let host = url
-            .host()
-            .ok_or_else(|| anyhow!("Vault URL missing host"))?;
-
+    pub fn new(url: &url::Url) -> Result<Self, VaultSourceError> {
+        let host = url.host().ok_or(VaultSourceError::MissingHost)?;
         let mount_path = host.to_string();
 
-        // Validate that the mount path is not empty after conversion
         if mount_path.is_empty() {
-            return Err(anyhow!("Vault URL host cannot be empty"));
+            return Err(VaultSourceError::EmptyHost);
         }
 
         Ok(VaultSource {
@@ -39,12 +57,11 @@ impl VaultSource {
     }
 
     // Generate the full URL to read and write secrets.
-    fn url(&self) -> Result<String> {
+    fn url(&self) -> Result<String, VaultSourceError> {
+        let addr = env::var("VAULT_ADDR").map_err(|_| VaultSourceError::MissingVaultAddr)?;
         Ok(format!(
             "{}/v1/{}{}",
-            env::var("VAULT_ADDR").with_context(|| "VAULT_ADDR environment variable not set")?,
-            self.mount_path,
-            self.secret_path
+            addr, self.mount_path, self.secret_path
         ))
     }
 }
@@ -62,8 +79,7 @@ impl super::Source for VaultSource {
             .call()?
             .into_reader();
 
-        let body: SecretResponse = serde_json::from_reader(body)
-            .with_context(|| "Unable to parse Vault server response")?;
+        let body: SecretResponse = serde_json::from_reader(body)?;
         let secrets: Secrets = body.data.into();
 
         Ok(secrets)
@@ -73,8 +89,7 @@ impl super::Source for VaultSource {
         let url = self.url()?;
         eprintln!("Writing secrets to Vault at {url}");
 
-        let body = serde_json::to_string(&secrets.content)
-            .with_context(|| "Unable to encode server request")?;
+        let body = serde_json::to_string(&secrets.content)?;
 
         self.client
             .put(&url)
@@ -87,16 +102,18 @@ impl super::Source for VaultSource {
 }
 
 // Prioritize the VAULT_TOKEN environment variable. But fall back to reading from ~/.vault-token
-fn find_token() -> Result<String> {
+fn find_token() -> Result<String, VaultSourceError> {
     if let Ok(token) = env::var("VAULT_TOKEN") {
         return Ok(token);
     }
 
-    let home_dir = dirs::home_dir()
-        .ok_or_else(|| anyhow!("Could not determine home directory for ~/.vault-token"))?;
+    let home_dir = dirs::home_dir().ok_or(VaultSourceError::NoHomeDir)?;
     let token_path = home_dir.join(".vault-token");
-    let token = std::fs::read_to_string(&token_path)
-        .with_context(|| format!("Unable to read token from {}", token_path.display()))?;
+    let token =
+        std::fs::read_to_string(&token_path).map_err(|source| VaultSourceError::ReadToken {
+            path: token_path.display().to_string(),
+            source,
+        })?;
 
     Ok(token.trim().to_string())
 }

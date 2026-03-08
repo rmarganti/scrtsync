@@ -8,6 +8,24 @@ use kube::{
 };
 use tokio::runtime::Runtime;
 
+#[derive(Debug, thiserror::Error)]
+pub enum K8sSourceError {
+    #[error("URL missing host for Kubernetes context")]
+    MissingContext,
+
+    #[error("Kubernetes context cannot be empty")]
+    EmptyContext,
+
+    #[error("failed to build Tokio runtime")]
+    Runtime(#[from] std::io::Error),
+
+    #[error("failed to load kubeconfig")]
+    Kubeconfig(#[from] kube::config::KubeconfigError),
+
+    #[error("failed to initialize Kubernetes API client")]
+    Client(#[from] kube::Error),
+}
+
 pub struct K8sSource {
     api: Api<K8sSecret>,
     runtime: Runtime,
@@ -15,20 +33,16 @@ pub struct K8sSource {
 }
 
 impl K8sSource {
-    pub fn new(url: &url::Url) -> Result<Self> {
+    pub fn new(url: &url::Url) -> Result<Self, K8sSourceError> {
         let runtime = tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()?;
 
-        let host = url
-            .host()
-            .ok_or_else(|| anyhow::anyhow!("URL missing host for Kubernetes context"))?;
-
+        let host = url.host().ok_or(K8sSourceError::MissingContext)?;
         let context = host.to_string();
 
-        // Validate that the context is not empty after conversion
         if context.is_empty() {
-            return Err(anyhow::anyhow!("Kubernetes context cannot be empty"));
+            return Err(K8sSourceError::EmptyContext);
         }
 
         let api = runtime.block_on(create_k8s_secrets_api(context))?;
@@ -49,9 +63,11 @@ impl super::Source for K8sSource {
             .runtime
             .block_on(self.api.get(self.secret_name.as_str()))?;
 
-        let data = body.data.ok_or_else(|| anyhow!("Secret data not found"))?;
+        let data = body
+            .data
+            .ok_or_else(|| anyhow!("secret '{}' has no data", self.secret_name))?;
 
-        Secrets::try_from(data)
+        Ok(Secrets::try_from(data)?)
     }
 
     fn write_secrets(&self, secrets: &crate::secrets::Secrets) -> Result<()> {
@@ -67,7 +83,7 @@ impl super::Source for K8sSource {
     }
 }
 
-async fn create_k8s_secrets_api(context: String) -> Result<Api<K8sSecret>> {
+async fn create_k8s_secrets_api(context: String) -> Result<Api<K8sSecret>, K8sSourceError> {
     let options = KubeConfigOptions {
         context: Some(context),
         ..KubeConfigOptions::default()

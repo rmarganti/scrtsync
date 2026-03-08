@@ -1,7 +1,25 @@
-use anyhow::{Context, Result};
 use k8s_openapi::ByteString;
 use std::collections::BTreeMap;
 use std::str;
+
+#[derive(Debug, thiserror::Error)]
+pub enum SecretsError {
+    #[error("unable to decode env value")]
+    DecodeEnv(#[from] dotenvy::Error),
+
+    #[error("unable to encode env value")]
+    EncodeValue(#[source] serde_json::Error),
+
+    #[error("unable to decode UTF-8 value for key '{key}'")]
+    InvalidUtf8 {
+        key: String,
+        #[source]
+        source: str::Utf8Error,
+    },
+
+    #[error(transparent)]
+    Io(#[from] std::io::Error),
+}
 
 #[derive(Debug)]
 pub struct Secrets {
@@ -18,12 +36,12 @@ impl Secrets {
     }
 
     /// Read a buffer of dotenv-style `KEY="VALUE"` lines into a Secrets struct.
-    pub fn from_reader<T: std::io::Read>(reader: &mut T) -> Result<Self> {
+    pub fn from_reader<T: std::io::Read>(reader: &mut T) -> Result<Self, SecretsError> {
         let mut secrets = Self::new();
         let iter = dotenvy::Iter::new(reader);
 
         for item in iter {
-            let (key, value) = item.with_context(|| "Unable to decode env value")?;
+            let (key, value) = item?;
             secrets.content.insert(key, value);
         }
 
@@ -31,17 +49,16 @@ impl Secrets {
     }
 
     /// Write secrets as dotenv-style `KEY="VALUE"` lines
-    pub fn to_writer<T: std::io::Write>(&self, buf: &mut T) -> Result<()> {
+    pub fn to_writer<T: std::io::Write>(&self, buf: &mut T) -> Result<(), SecretsError> {
         for (key, value) in &self.content {
             let line = format!(
                 "{}={}\n",
                 key,
                 // JSON-encoding is a convenient way to escape characters.
-                serde_json::to_string(value).with_context(|| "Unable to encode env value")?
+                serde_json::to_string(value).map_err(SecretsError::EncodeValue)?
             );
 
-            buf.write(line.as_bytes())
-                .with_context(|| "Unable to write secrets")?;
+            buf.write_all(line.as_bytes())?;
         }
 
         Ok(())
@@ -63,14 +80,17 @@ impl From<&BTreeMap<String, String>> for Secrets {
 }
 
 impl TryFrom<BTreeMap<String, ByteString>> for Secrets {
-    type Error = anyhow::Error;
+    type Error = SecretsError;
 
     fn try_from(map: BTreeMap<String, ByteString>) -> Result<Self, Self::Error> {
         let mut content = BTreeMap::new();
 
         for (key, value) in map {
             let string_value = str::from_utf8(&value.0)
-                .with_context(|| format!("Unable to decode UTF-8 value for key '{key}'"))?
+                .map_err(|source| SecretsError::InvalidUtf8 {
+                    key: key.clone(),
+                    source,
+                })?
                 .to_string();
             content.insert(key, string_value);
         }
@@ -188,6 +208,6 @@ mod tests {
         assert!(result.is_err());
 
         let error_message = result.unwrap_err().to_string();
-        assert!(error_message.contains("Unable to decode UTF-8 value for key 'invalid'"));
+        assert!(error_message.contains("unable to decode UTF-8 value for key 'invalid'"));
     }
 }

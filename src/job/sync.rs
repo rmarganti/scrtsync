@@ -13,16 +13,16 @@ impl SyncJob {
 }
 
 impl super::Job for SyncJob {
-    /// Synchronise the secrets from an origin to a target
+    /// Synchronize the secrets from an origin to a target
     fn run(&self) -> Result<()> {
         let secrets = self
             .origin
             .read_secrets()
-            .with_context(|| "Unable to read secrets")?;
+            .context("unable to read secrets from source")?;
 
         self.target
             .write_secrets(&secrets)
-            .with_context(|| "Unable to write secrets")?;
+            .context("unable to write secrets to target")?;
 
         Ok(())
     }
