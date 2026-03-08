@@ -10,13 +10,12 @@ mod sources;
 fn main() -> Result<()> {
     let args = Args::parse();
     let cfg = Config::from_file(&args.config)
-        .with_context(|| format!("Failed to load config from '{}'", args.config))?;
+        .with_context(|| format!("failed to load config from '{}'", args.config))?;
 
-    args.validate(&cfg)
-        .with_context(|| "Invalid command line arguments")?;
+    args.validate(&cfg)?;
 
     let job = job::new_job(&cfg, args.from, args.to, args.preset)
-        .with_context(|| "Could not build job")?;
+        .context("could not build job")?;
 
     job.run()?;
 

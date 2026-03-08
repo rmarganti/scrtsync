@@ -1,8 +1,5 @@
-use crate::sources::Source;
+use crate::sources::{Source, SourceError};
 use anyhow::Result;
-use std::error;
-use std::fmt;
-use std::io;
 use std::io::IsTerminal;
 
 mod init;
@@ -24,52 +21,27 @@ pub fn new_job(
 
     let preset_cfg = preset.as_ref().and_then(|p| config.presets.get(p));
 
-    let from = if io::stdin().is_terminal() {
+    let from = if std::io::stdin().is_terminal() {
         from
     } else {
-        // Use stdin if piping in
         Some("std://".to_string())
     };
 
-    let from = from // stdin (when piping) and `--from` take precedent
+    let from = from
         .or_else(|| preset_cfg.map(|p| p.from.clone()))
-        .map(|uri| <dyn Source>::new(&uri)) // Build the Source
-        .unwrap_or_else(|| Err(NoSourceProvidedError::new("from").into()))?;
+        .ok_or(SourceError::NoSourceProvided { field: "from" })?;
+    let from = <dyn Source>::new(&from)?;
 
-    let to = if io::stdout().is_terminal() {
+    let to = if std::io::stdout().is_terminal() {
         to
     } else {
-        // Use stdin if piping out
         Some("std://".to_string())
     };
 
-    let to = to // stdout (when piping) and `--to` take precedent
+    let to = to
         .or_else(|| preset_cfg.map(|p| p.to.clone()))
-        .map(|uri| <dyn Source>::new(&uri)) // Build the Source
-        .unwrap_or_else(|| Err(NoSourceProvidedError::new("to").into()))?;
+        .ok_or(SourceError::NoSourceProvided { field: "to" })?;
+    let to = <dyn Source>::new(&to)?;
 
     Ok(Box::new(sync::SyncJob::new(from, to)))
 }
-
-#[derive(Debug, Clone)]
-struct NoSourceProvidedError {
-    field: &'static str,
-}
-
-impl NoSourceProvidedError {
-    fn new(field: &'static str) -> Self {
-        NoSourceProvidedError { field }
-    }
-}
-
-impl fmt::Display for NoSourceProvidedError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "unable to determine source, provide either `--{}` or a preset",
-            self.field,
-        )
-    }
-}
-
-impl error::Error for NoSourceProvidedError {}
