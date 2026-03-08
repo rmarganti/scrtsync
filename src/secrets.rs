@@ -58,7 +58,7 @@ impl Secrets {
                 serde_json::to_string(value).map_err(SecretsError::EncodeValue)?
             );
 
-            buf.write(line.as_bytes())?;
+            buf.write_all(line.as_bytes())?;
         }
 
         Ok(())
