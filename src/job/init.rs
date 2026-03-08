@@ -28,8 +28,7 @@ impl Job for InitJob {
             return Err(InitError::AlreadyExists(DEFAULT_FILENAME.to_string()).into());
         }
 
-        let mut file =
-            std::fs::File::create(path).map_err(InitError::CreateFile)?;
+        let mut file = std::fs::File::create(path).map_err(InitError::CreateFile)?;
 
         file.write_all(DEFAULT_CONFIG)
             .map_err(InitError::WriteFile)?;

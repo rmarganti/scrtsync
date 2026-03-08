@@ -109,10 +109,11 @@ fn find_token() -> Result<String, VaultSourceError> {
 
     let home_dir = dirs::home_dir().ok_or(VaultSourceError::NoHomeDir)?;
     let token_path = home_dir.join(".vault-token");
-    let token = std::fs::read_to_string(&token_path).map_err(|source| VaultSourceError::ReadToken {
-        path: token_path.display().to_string(),
-        source,
-    })?;
+    let token =
+        std::fs::read_to_string(&token_path).map_err(|source| VaultSourceError::ReadToken {
+            path: token_path.display().to_string(),
+            source,
+        })?;
 
     Ok(token.trim().to_string())
 }
