@@ -59,3 +59,23 @@ For convenience, you can define presets in a config file and then reference them
 | ---------- | -------------------------------------------------------------------- |
 | `--config` | Path to a config file. Defaults to `.scrtsync.json`.                 |
 | `--diff`   | Show a diff between `--from` and `--to` without writing any secrets. |
+
+## Development
+
+### Preparing a Release
+
+1. Trigger the "Prepare Release" workflow manually from the Actions tab
+   - This automatically bumps the version, updates the CHANGELOG, and creates a git tag
+
+### Publishing a Release
+
+1. The "Build and Publish" workflow runs automatically when a release is published
+   - Builds binaries for Linux (x86_64, aarch64) and macOS (x86_64)
+   - Publishes binaries to the GitHub Release
+   - Automatically updates the Homebrew formula in `rmarganti/homebrew-tap`
+
+Users can then install the new version via:
+```sh
+brew tap rmarganti/tap
+brew install secret-sync
+```
