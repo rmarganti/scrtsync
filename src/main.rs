@@ -14,7 +14,8 @@ fn main() -> Result<()> {
 
     args.validate(&cfg)?;
 
-    let job = job::new_job(&cfg, args.from, args.to, args.preset).context("could not build job")?;
+    let job = job::new_job(&cfg, args.from, args.to, args.preset, args.diff)
+        .context("could not build job")?;
 
     job.run()?;
 
