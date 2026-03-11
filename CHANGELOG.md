@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [1.4.0](https://github.com/rmarganti/scrtsync/compare/v1.3.1...v1.4.0) (2026-03-11)
+
+
+### Bug Fixes
+
+* **diff:** don't count equal values as changes ([fa3c780](https://github.com/rmarganti/scrtsync/commit/fa3c780a07b91fbe6f206e786065bfdcd388d00f))
+
 ### [1.3.1](https://github.com/rmarganti/scrtsync/compare/v1.3.0...v1.3.1) (2025-07-03)
 
 ## [1.3.0](https://github.com/rmarganti/scrtsync/compare/v1.2.0...v1.3.0) (2025-07-03)
