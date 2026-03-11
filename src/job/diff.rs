@@ -61,7 +61,6 @@ impl super::Job for DiffJob {
                 }
                 (Some(from_val), Some(to_val)) if from_val == to_val => {
                     println!("  {key}={from_val}");
-                    changed += 1;
                 }
                 // All cases should be covered. (None, None) is impossible
                 // (Some(_), Some(_)) variations are covered above.
