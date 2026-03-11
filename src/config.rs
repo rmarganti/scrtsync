@@ -47,6 +47,10 @@ pub struct Args {
     #[arg(short, long)]
     pub to: Option<String>,
 
+    /// Show a diff between --from and --to without writing any secrets
+    #[arg(short = 'd', long)]
+    pub diff: bool,
+
     /// An optional preset defined in a config file
     pub preset: Option<String>,
 }
@@ -60,9 +64,19 @@ impl Args {
             }
         }
 
-        // If no preset and no from/to args, that's an error
-        if self.preset.is_none() && self.from.is_none() && self.to.is_none() {
-            return Err(ConfigError::MissingArguments);
+        if self.diff {
+            // Diff mode: need both sides (preset supplies both, or both --from and --to)
+            let has_from = self.preset.is_some() || self.from.is_some();
+            let has_to = self.preset.is_some() || self.to.is_some();
+
+            if !has_from || !has_to {
+                return Err(ConfigError::MissingArguments);
+            }
+        } else {
+            // Sync mode: need both sides
+            if self.preset.is_none() && (self.from.is_none() || self.to.is_none()) {
+                return Err(ConfigError::MissingArguments);
+            }
         }
 
         Ok(())
