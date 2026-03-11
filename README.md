@@ -7,10 +7,10 @@ Sync secrets between [Vault](https://www.vaultproject.io/) and a local `.env`.
 - Binaries can be downloaded from the [releases page](https://github.com/rmarganti/scrtsync/releases).
 - Mac users can install via Homebrew:
 
-    ```sh
-    brew tap rmarganti/tap
-    brew install secret-sync
-    ```
+  ```sh
+  brew tap rmarganti/tap
+  brew install secret-sync
+  ```
 
 ## Syncing secrets between sources
 
@@ -33,21 +33,21 @@ For convenience, you can define presets in a config file and then reference them
 2. This will create a `.scrtsync.json` file to your project's root directory. It is a JSON
    file that looks like the following:
 
-    ```json
-    {
-        "$schema": "https://raw.githubusercontent.com/rmarganti/scrtsync/main/schemas/scrtsync.schema.1.0.0.json",
-        "presets": {
-            "pull": {
-                "from": "vault://secrets/you/secret/path",
-                "to": "file://.env"
-            },
-            "push": {
-                "from": "file://.env",
-                "to": "vault://secrets/you/secret/path"
-            }
-        }
-    }
-    ```
+   ```json
+   {
+     "$schema": "https://raw.githubusercontent.com/rmarganti/scrtsync/main/schemas/scrtsync.schema.1.0.0.json",
+     "presets": {
+       "pull": {
+         "from": "vault://secrets/you/secret/path",
+         "to": "file://.env"
+       },
+       "push": {
+         "from": "file://.env",
+         "to": "vault://secrets/you/secret/path"
+       }
+     }
+   }
+   ```
 
 3. You can now run these presets by referencing them by name. To run the above,
    run either `scrtsync pull` or `scrtsync push`.
@@ -55,6 +55,7 @@ For convenience, you can define presets in a config file and then reference them
 
 ## Options
 
-| option     | description                                          |
-| ---------- | ---------------------------------------------------- |
-| `--config` | Path to a config file. Defaults to `.scrtsync.json`. |
+| option     | description                                                          |
+| ---------- | -------------------------------------------------------------------- |
+| `--config` | Path to a config file. Defaults to `.scrtsync.json`.                 |
+| `--diff`   | Show a diff between `--from` and `--to` without writing any secrets. |
