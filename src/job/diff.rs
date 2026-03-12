@@ -28,6 +28,45 @@ impl DiffJob {
     }
 }
 
+impl super::Job for DiffJob {
+    fn run(&self) -> Result<()> {
+        let from_secrets = self
+            .from
+            .read_secrets()
+            .context("unable to read secrets from source")?;
+
+        let to_secrets = self
+            .to
+            .read_secrets()
+            .context("unable to read secrets from target")?;
+
+        let from_map = &from_secrets.content;
+        let to_map = &to_secrets.content;
+
+        let (diff_lines, added, changed, removed) = build_diff_lines(from_map, to_map);
+
+        if added == 0 && changed == 0 && removed == 0 {
+            eprintln!("Secrets are in sync.");
+            return Ok(());
+        }
+
+        let hunks = build_hunks(&diff_lines);
+        let printer = DiffPrinter::new();
+
+        printer.print_header(&self.from_uri, &self.to_uri);
+        for hunk in &hunks {
+            printer.print_hunk_header(hunk);
+            for line in &hunk.lines {
+                printer.print_line(line);
+            }
+        }
+
+        eprintln!("\n{added} added, {changed} changed, {removed} removed");
+
+        Ok(())
+    }
+}
+
 /// Format a key=value pair in dotenv style, matching Secrets::to_writer escaping.
 fn format_entry(key: &str, value: &str) -> String {
     let escaped = serde_json::to_string(value).unwrap_or_else(|_| value.to_string());
@@ -36,11 +75,17 @@ fn format_entry(key: &str, value: &str) -> String {
 
 #[derive(Clone, Debug)]
 enum DiffLine {
+    /// Unchanged line surrounding a change
     Context(String),
+
+    /// Line that should be removed from the target
     Remove(String),
+
+    /// Line that should be added to the target
     Add(String),
 }
 
+/// Build a list of DiffLine representing the differences between from_map and to_map.
 fn build_diff_lines(
     from_map: &BTreeMap<String, String>,
     to_map: &BTreeMap<String, String>,
@@ -79,6 +124,7 @@ fn build_diff_lines(
     (diff_lines, added, changed, removed)
 }
 
+/// Group DiffLines into hunks with CONTEXT_LINES of unchanged lines around each change.
 struct Hunk {
     old_start: usize,
     new_start: usize,
@@ -169,6 +215,7 @@ fn build_hunks(diff_lines: &[DiffLine]) -> Vec<Hunk> {
     hunks
 }
 
+/// Helper for printing diffs with optional color support.
 struct DiffPrinter {
     use_color: bool,
 }
@@ -230,45 +277,6 @@ impl DiffPrinter {
                 }
             }
         }
-    }
-}
-
-impl super::Job for DiffJob {
-    fn run(&self) -> Result<()> {
-        let from_secrets = self
-            .from
-            .read_secrets()
-            .context("unable to read secrets from source")?;
-
-        let to_secrets = self
-            .to
-            .read_secrets()
-            .context("unable to read secrets from target")?;
-
-        let from_map = &from_secrets.content;
-        let to_map = &to_secrets.content;
-
-        let (diff_lines, added, changed, removed) = build_diff_lines(from_map, to_map);
-
-        if added == 0 && changed == 0 && removed == 0 {
-            eprintln!("Secrets are in sync.");
-            return Ok(());
-        }
-
-        let hunks = build_hunks(&diff_lines);
-        let printer = DiffPrinter::new();
-
-        printer.print_header(&self.from_uri, &self.to_uri);
-        for hunk in &hunks {
-            printer.print_hunk_header(hunk);
-            for line in &hunk.lines {
-                printer.print_line(line);
-            }
-        }
-
-        eprintln!("\n{added} added, {changed} changed, {removed} removed");
-
-        Ok(())
     }
 }
 
