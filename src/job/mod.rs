@@ -36,7 +36,7 @@ pub fn new_job(
             .ok_or(SourceError::NoSourceProvided { field: "to" })?;
         let to_source = <dyn Source>::new(&to_uri)?;
 
-        return Ok(Box::new(diff::DiffJob::new(from_source, to_source)));
+        return Ok(Box::new(diff::DiffJob::new(from_source, to_source, from_uri, to_uri)));
     }
 
     let from = if std::io::stdin().is_terminal() {
