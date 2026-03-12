@@ -8,23 +8,12 @@ const CONTEXT_LINES: usize = 3;
 pub struct DiffJob {
     from: Box<dyn Source>,
     to: Box<dyn Source>,
-    from_uri: String,
     to_uri: String,
 }
 
 impl DiffJob {
-    pub fn new(
-        from: Box<dyn Source>,
-        to: Box<dyn Source>,
-        from_uri: String,
-        to_uri: String,
-    ) -> Self {
-        Self {
-            from,
-            to,
-            from_uri,
-            to_uri,
-        }
+    pub fn new(from: Box<dyn Source>, to: Box<dyn Source>, to_uri: String) -> Self {
+        Self { from, to, to_uri }
     }
 }
 
@@ -53,7 +42,7 @@ impl super::Job for DiffJob {
         let hunks = build_hunks(&diff_lines);
         let printer = DiffPrinter::new();
 
-        printer.print_header(&self.from_uri, &self.to_uri);
+        printer.print_header(&self.to_uri);
         for hunk in &hunks {
             printer.print_hunk_header(hunk);
             for line in &hunk.lines {
@@ -227,13 +216,13 @@ impl DiffPrinter {
         }
     }
 
-    fn print_header(&self, from_uri: &str, to_uri: &str) {
+    fn print_header(&self, uri: &str) {
         if self.use_color {
-            println!("\x1b[1m--- {to_uri} (current)\x1b[0m");
-            println!("\x1b[1m+++ {from_uri} (desired)\x1b[0m");
+            println!("\x1b[1m--- a/{uri}\x1b[0m");
+            println!("\x1b[1m+++ b/{uri}\x1b[0m");
         } else {
-            println!("--- {to_uri} (current)");
-            println!("+++ {from_uri} (desired)");
+            println!("--- a/{uri}");
+            println!("+++ b/{uri}");
         }
     }
 
