@@ -365,7 +365,10 @@ mod tests {
             .find(|l| matches!(l, DiffLine::Add(_)))
             .unwrap();
         if let DiffLine::Add(text) = add_line {
-            assert!(text.contains(r#"\"world\""#), "Value should be JSON-escaped");
+            assert!(
+                text.contains(r#"\"world\""#),
+                "Value should be JSON-escaped"
+            );
             assert!(text.contains(r#"\n"#), "Newlines should be escaped");
         }
     }
