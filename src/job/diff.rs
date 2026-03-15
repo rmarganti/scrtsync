@@ -57,8 +57,11 @@ impl super::Job for DiffJob {
 }
 
 /// Format a key=value pair in dotenv style, matching Secrets::to_writer escaping.
+/// Dollar signs are escaped as `\$` to prevent dotenvy variable substitution.
 fn format_entry(key: &str, value: &str) -> String {
-    let escaped = serde_json::to_string(value).unwrap_or_else(|_| value.to_string());
+    let escaped = serde_json::to_string(value)
+        .unwrap_or_else(|_| value.to_string())
+        .replace('$', "\\$");
     format!("{key}={escaped}")
 }
 
@@ -473,5 +476,28 @@ mod tests {
             .count();
         assert_eq!(old_count, 3); // A (ctx) + B old (remove) + C (ctx)
         assert_eq!(new_count, 3); // A (ctx) + B new (add) + C (ctx)
+    }
+
+    #[test]
+    fn dollar_signs_are_escaped_in_diff() {
+        let from = make_secrets(&[("SECRET", "p@$$word")]);
+        let to = make_secrets(&[]);
+        let (diff_lines, _, _, _) = build_diff_lines(&from.content, &to.content);
+        let hunks = build_hunks(&diff_lines);
+        let add_line = hunks[0]
+            .lines
+            .iter()
+            .find(|l| matches!(l, DiffLine::Add(_)))
+            .unwrap();
+        if let DiffLine::Add(text) = add_line {
+            assert!(
+                text.contains(r#"\$"#),
+                "Dollar signs should be escaped in diff output; got: {text}"
+            );
+            assert!(
+                !text.contains("$$"),
+                "Unescaped double-dollar should not appear in diff output; got: {text}"
+            );
+        }
     }
 }
