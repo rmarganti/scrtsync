@@ -1,10 +1,21 @@
 use crate::secrets::Secrets;
-use anyhow::Result;
 
 #[derive(Debug, thiserror::Error)]
 pub enum FileSourceError {
     #[error("unable to parse file path from URL")]
     InvalidPath,
+
+    #[error("unable to open file for reading")]
+    OpenFile(#[source] std::io::Error),
+
+    #[error("unable to create file for writing")]
+    CreateFile(#[source] std::io::Error),
+
+    #[error("unable to parse secrets")]
+    Parse(#[source] crate::secrets::SecretsError),
+
+    #[error("unable to write secrets")]
+    Write(#[source] crate::secrets::SecretsError),
 }
 
 pub struct FileSource {
@@ -27,15 +38,25 @@ impl FileSource {
 }
 
 impl super::Source for FileSource {
-    fn read_secrets(&self) -> Result<crate::secrets::Secrets> {
+    fn read_secrets(&self) -> Result<crate::secrets::Secrets, super::SourceSecretsError> {
         eprintln!("Reading secrets from file at {}", self.path);
-        let mut file = std::fs::File::open(&self.path)?;
-        Ok(Secrets::from_reader(&mut file)?)
+        let mut file = std::fs::File::open(&self.path).map_err(FileSourceError::OpenFile)?;
+        let secrets = Secrets::from_reader(&mut file).map_err(FileSourceError::Parse)?;
+
+        Ok(secrets)
     }
 
-    fn write_secrets(&self, secrets: &crate::secrets::Secrets) -> Result<()> {
+    fn write_secrets(
+        &self,
+        secrets: &crate::secrets::Secrets,
+    ) -> Result<(), super::SourceSecretsError> {
         eprintln!("Writing secrets to file at {}", self.path);
-        let mut file = std::fs::File::create(&self.path)?;
-        Ok(secrets.to_writer(&mut file)?)
+        let mut file = std::fs::File::create(&self.path).map_err(FileSourceError::CreateFile)?;
+
+        secrets
+            .to_writer(&mut file)
+            .map_err(FileSourceError::Write)?;
+
+        Ok(())
     }
 }

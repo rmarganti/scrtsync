@@ -1,5 +1,4 @@
 use crate::secrets::Secrets;
-use anyhow::Result;
 use serde::Deserialize;
 use serde::Serialize;
 use serde_json::Value;
@@ -27,6 +26,21 @@ pub enum VaultSourceError {
         #[source]
         source: std::io::Error,
     },
+
+    #[error("unable to decode payload")]
+    Decode(#[source] serde_json::Error),
+
+    #[error("unable to encode payload")]
+    Encode(#[source] serde_json::Error),
+
+    #[error("network error")]
+    Network(Box<ureq::Error>),
+}
+
+impl From<ureq::Error> for VaultSourceError {
+    fn from(e: ureq::Error) -> Self {
+        Self::Network(Box::new(e))
+    }
 }
 
 pub struct VaultSource {
@@ -67,7 +81,7 @@ impl VaultSource {
 }
 
 impl super::Source for VaultSource {
-    fn read_secrets(&self) -> Result<crate::secrets::Secrets> {
+    fn read_secrets(&self) -> Result<crate::secrets::Secrets, super::SourceSecretsError> {
         let url = self.url()?;
         eprintln!("Reading secrets from Vault at {url}");
 
@@ -76,26 +90,33 @@ impl super::Source for VaultSource {
             .get(&url)
             .set("Content-Type", "application/json")
             .set("X-Vault-Token", &self.token)
-            .call()?
+            .call()
+            .map_err(VaultSourceError::from)?
             .into_reader();
 
-        let body: SecretResponse = serde_json::from_reader(body)?;
+        let body: SecretResponse =
+            serde_json::from_reader(body).map_err(VaultSourceError::Decode)?;
+
         let secrets: Secrets = body.data.into();
 
         Ok(secrets)
     }
 
-    fn write_secrets(&self, secrets: &crate::secrets::Secrets) -> Result<()> {
+    fn write_secrets(
+        &self,
+        secrets: &crate::secrets::Secrets,
+    ) -> Result<(), super::SourceSecretsError> {
         let url = self.url()?;
         eprintln!("Writing secrets to Vault at {url}");
 
-        let body = serde_json::to_string(&secrets.content)?;
+        let body = serde_json::to_string(&secrets.content).map_err(VaultSourceError::Encode)?;
 
         self.client
             .put(&url)
             .set("X-Vault-Token", &self.token)
             .set("Content-Type", "application/json")
-            .send_string(&body)?;
+            .send_string(&body)
+            .map_err(VaultSourceError::from)?;
 
         Ok(())
     }

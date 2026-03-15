@@ -17,8 +17,8 @@ pub enum SecretsError {
         source: str::Utf8Error,
     },
 
-    #[error(transparent)]
-    Io(#[from] std::io::Error),
+    #[error("unable to write env entry")]
+    WriteEntry(#[source] std::io::Error),
 }
 
 #[derive(Debug)]
@@ -58,7 +58,8 @@ impl Secrets {
                 serde_json::to_string(value).map_err(SecretsError::EncodeValue)?
             );
 
-            buf.write_all(line.as_bytes())?;
+            buf.write_all(line.as_bytes())
+                .map_err(SecretsError::WriteEntry)?;
         }
 
         Ok(())

@@ -1,4 +1,3 @@
-use anyhow::Result;
 use url::Url;
 
 mod file;
@@ -7,7 +6,7 @@ mod stdinout;
 mod vault;
 
 #[derive(Debug, thiserror::Error)]
-pub enum SourceError {
+pub enum SourceCreateError {
     #[error("unsupported source scheme: {0}")]
     UnsupportedScheme(String),
 
@@ -27,16 +26,29 @@ pub enum SourceError {
     Vault(#[from] vault::VaultSourceError),
 }
 
-/// Source trait for reading/writing secrets. Methods return `anyhow::Result`
-/// intentionally — runtime errors come from diverse backends (kube, HTTP, io)
-/// and callers don't need to match on specific variants.
+#[derive(Debug, thiserror::Error)]
+pub enum SourceSecretsError {
+    #[error("file error")]
+    File(#[from] file::FileSourceError),
+
+    #[error("kubernetes error")]
+    K8s(#[from] k8s::K8sSourceError),
+
+    #[error("stdin/stdout error")]
+    StdInOut(#[from] stdinout::StdInOutSourceError),
+
+    #[error("vault error")]
+    Vault(#[from] vault::VaultSourceError),
+}
+
+/// Source trait for reading/writing secrets.
 pub trait Source {
-    fn read_secrets(&self) -> Result<crate::secrets::Secrets>;
-    fn write_secrets(&self, secrets: &crate::secrets::Secrets) -> Result<()>;
+    fn read_secrets(&self) -> Result<crate::secrets::Secrets, SourceSecretsError>;
+    fn write_secrets(&self, secrets: &crate::secrets::Secrets) -> Result<(), SourceSecretsError>;
 }
 
 impl dyn Source {
-    pub fn new(uri: &str) -> Result<Box<dyn Source>, SourceError> {
+    pub fn new(uri: &str) -> Result<Box<dyn Source>, SourceCreateError> {
         let url = Url::parse(uri)?;
 
         let source: Box<dyn Source> = match url.scheme() {
@@ -44,7 +56,7 @@ impl dyn Source {
             "k8s" | "kubernetes" => Box::new(k8s::K8sSource::new(&url)?),
             "std" => Box::new(stdinout::StdInOutSource::new()),
             "vault" => Box::new(vault::VaultSource::new(&url)?),
-            other => return Err(SourceError::UnsupportedScheme(other.to_string())),
+            other => return Err(SourceCreateError::UnsupportedScheme(other.to_string())),
         };
 
         Ok(source)
