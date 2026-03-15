@@ -1,4 +1,4 @@
-use crate::sources::{Source, SourceError};
+use crate::sources::{Source, SourceCreateError};
 use anyhow::Result;
 use std::io::IsTerminal;
 
@@ -28,12 +28,12 @@ pub fn new_job(
         // Both `from` and `to` are required (enforced by Args::validate).
         let from_uri = from
             .or_else(|| preset_cfg.map(|p| p.from.clone()))
-            .ok_or(SourceError::NoSourceProvided { field: "from" })?;
+            .ok_or(SourceCreateError::NoSourceProvided { field: "from" })?;
         let from_source = <dyn Source>::new(&from_uri)?;
 
         let to_uri = to
             .or_else(|| preset_cfg.map(|p| p.to.clone()))
-            .ok_or(SourceError::NoSourceProvided { field: "to" })?;
+            .ok_or(SourceCreateError::NoSourceProvided { field: "to" })?;
         let to_source = <dyn Source>::new(&to_uri)?;
 
         return Ok(Box::new(diff::DiffJob::new(from_source, to_source, to_uri)));
@@ -47,7 +47,7 @@ pub fn new_job(
 
     let from = from
         .or_else(|| preset_cfg.map(|p| p.from.clone()))
-        .ok_or(SourceError::NoSourceProvided { field: "from" })?;
+        .ok_or(SourceCreateError::NoSourceProvided { field: "from" })?;
     let from = <dyn Source>::new(&from)?;
 
     let to = if std::io::stdout().is_terminal() {
@@ -58,7 +58,7 @@ pub fn new_job(
 
     let to = to
         .or_else(|| preset_cfg.map(|p| p.to.clone()))
-        .ok_or(SourceError::NoSourceProvided { field: "to" })?;
+        .ok_or(SourceCreateError::NoSourceProvided { field: "to" })?;
     let to = <dyn Source>::new(&to)?;
 
     Ok(Box::new(sync::SyncJob::new(from, to)))

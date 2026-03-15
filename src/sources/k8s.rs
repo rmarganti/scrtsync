@@ -1,5 +1,7 @@
-use crate::secrets::Secrets;
-use anyhow::{anyhow, Result};
+use crate::{
+    secrets::{Secrets, SecretsError},
+    sources::SourceSecretsError,
+};
 use k8s_openapi::api::core::v1::Secret as K8sSecret;
 use kube::{
     api::{ObjectMeta, PostParams},
@@ -17,13 +19,22 @@ pub enum K8sSourceError {
     EmptyContext,
 
     #[error("failed to build Tokio runtime")]
-    Runtime(#[from] std::io::Error),
+    BuildRuntime(#[source] std::io::Error),
 
     #[error("failed to load kubeconfig")]
     Kubeconfig(#[from] kube::config::KubeconfigError),
 
     #[error("failed to initialize Kubernetes API client")]
-    Client(#[from] kube::Error),
+    Client(#[source] kube::Error),
+
+    #[error("Kubernetes API call failed")]
+    Api(#[source] kube::Error),
+
+    #[error("secret '{name}' exists but contains no data")]
+    EmptySecret { name: String },
+
+    #[error("failed to decode Kubernetes secret data")]
+    Decode(#[source] SecretsError),
 }
 
 pub struct K8sSource {
@@ -36,7 +47,8 @@ impl K8sSource {
     pub fn new(url: &url::Url) -> Result<Self, K8sSourceError> {
         let runtime = tokio::runtime::Builder::new_current_thread()
             .enable_all()
-            .build()?;
+            .build()
+            .map_err(K8sSourceError::BuildRuntime)?;
 
         let host = url.host().ok_or(K8sSourceError::MissingContext)?;
         let context = host.to_string();
@@ -56,21 +68,24 @@ impl K8sSource {
 }
 
 impl super::Source for K8sSource {
-    fn read_secrets(&self) -> Result<crate::secrets::Secrets> {
+    fn read_secrets(&self) -> Result<crate::secrets::Secrets, SourceSecretsError> {
         eprintln!("Reading secrets from k8s secret {}", self.secret_name);
 
         let body = self
             .runtime
-            .block_on(self.api.get(self.secret_name.as_str()))?;
+            .block_on(self.api.get(self.secret_name.as_str()))
+            .map_err(K8sSourceError::Api)?;
 
-        let data = body
-            .data
-            .ok_or_else(|| anyhow!("secret '{}' has no data", self.secret_name))?;
+        let data = body.data.ok_or_else(|| K8sSourceError::EmptySecret {
+            name: self.secret_name.clone(),
+        })?;
 
-        Ok(Secrets::try_from(data)?)
+        let secrets = Secrets::try_from(data).map_err(K8sSourceError::Decode)?;
+
+        Ok(secrets)
     }
 
-    fn write_secrets(&self, secrets: &crate::secrets::Secrets) -> Result<()> {
+    fn write_secrets(&self, secrets: &crate::secrets::Secrets) -> Result<(), SourceSecretsError> {
         eprintln!("Writing secrets to k8s secret {}", self.secret_name);
 
         self.runtime.block_on(create_or_update_secrets(
@@ -90,7 +105,7 @@ async fn create_k8s_secrets_api(context: String) -> Result<Api<K8sSecret>, K8sSo
     };
 
     let config = kube::Config::from_kubeconfig(&options).await?;
-    let client = kube::Client::try_from(config)?;
+    let client = kube::Client::try_from(config).map_err(K8sSourceError::Client)?;
     let api: Api<K8sSecret> = Api::default_namespaced(client);
 
     Ok(api)
@@ -100,7 +115,7 @@ async fn create_or_update_secrets(
     api: &Api<K8sSecret>,
     secret_name: &str,
     secrets: &crate::secrets::Secrets,
-) -> Result<()> {
+) -> Result<(), K8sSourceError> {
     let payload = K8sSecret {
         metadata: ObjectMeta {
             name: Some(secret_name.to_string()),
@@ -110,14 +125,19 @@ async fn create_or_update_secrets(
         ..K8sSecret::default()
     };
 
-    let existing_secret = api.get_opt(secret_name).await?;
+    let existing_secret = api.get_opt(secret_name).await.map_err(K8sSourceError::Api)?;
 
     match existing_secret {
         Some(_) => {
             api.replace(secret_name, &PostParams::default(), &payload)
-                .await?
+                .await
+                .map_err(K8sSourceError::Api)?
         }
-        None => api.create(&PostParams::default(), &payload).await?,
+        None => {
+            api.create(&PostParams::default(), &payload)
+                .await
+                .map_err(K8sSourceError::Api)?
+        }
     };
 
     Ok(())

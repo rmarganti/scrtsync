@@ -14,7 +14,7 @@ pub enum ConfigError {
     },
 
     #[error("could not parse config file")]
-    Parse(#[from] serde_json::Error),
+    Parse(#[source] serde_json::Error),
 
     #[error("invalid `{field}` URL in preset '{preset}'")]
     InvalidPresetUrl {
@@ -109,7 +109,7 @@ impl Config {
         })?;
         let reader = io::BufReader::new(file);
 
-        let cfg: Config = serde_json::from_reader(reader)?;
+        let cfg: Config = serde_json::from_reader(reader).map_err(ConfigError::Parse)?;
 
         cfg.validate()?;
 
