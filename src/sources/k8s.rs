@@ -125,19 +125,20 @@ async fn create_or_update_secrets(
         ..K8sSecret::default()
     };
 
-    let existing_secret = api.get_opt(secret_name).await.map_err(K8sSourceError::Api)?;
+    let existing_secret = api
+        .get_opt(secret_name)
+        .await
+        .map_err(K8sSourceError::Api)?;
 
     match existing_secret {
-        Some(_) => {
-            api.replace(secret_name, &PostParams::default(), &payload)
-                .await
-                .map_err(K8sSourceError::Api)?
-        }
-        None => {
-            api.create(&PostParams::default(), &payload)
-                .await
-                .map_err(K8sSourceError::Api)?
-        }
+        Some(_) => api
+            .replace(secret_name, &PostParams::default(), &payload)
+            .await
+            .map_err(K8sSourceError::Api)?,
+        None => api
+            .create(&PostParams::default(), &payload)
+            .await
+            .map_err(K8sSourceError::Api)?,
     };
 
     Ok(())

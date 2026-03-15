@@ -48,15 +48,18 @@ impl Secrets {
         Ok(secrets)
     }
 
-    /// Write secrets as dotenv-style `KEY="VALUE"` lines
+    /// Write secrets as dotenv-style `KEY="VALUE"` lines.
+    /// Dollar signs are escaped as `\$` to prevent dotenvy variable substitution.
     pub fn to_writer<T: std::io::Write>(&self, buf: &mut T) -> Result<(), SecretsError> {
         for (key, value) in &self.content {
-            let line = format!(
-                "{}={}\n",
-                key,
-                // JSON-encoding is a convenient way to escape characters.
-                serde_json::to_string(value).map_err(SecretsError::EncodeValue)?
-            );
+            let encoded = serde_json::to_string(value)
+                .map_err(SecretsError::EncodeValue)?
+                // Escape `$` so that dotenvy does not perform variable substitution
+                // when reading the value back. dotenvy recognises `\$` inside
+                // double-quoted strings as a literal dollar sign.
+                .replace('$', "\\$");
+
+            let line = format!("{}={}\n", key, encoded);
 
             buf.write_all(line.as_bytes())
                 .map_err(SecretsError::WriteEntry)?;
@@ -210,5 +213,55 @@ mod tests {
 
         let error_message = result.unwrap_err().to_string();
         assert!(error_message.contains("unable to decode UTF-8 value for key 'invalid'"));
+    }
+
+    #[test]
+    fn dollar_sign_is_escaped_on_write() {
+        let mut map = BTreeMap::new();
+        map.insert("SECRET".to_string(), "p@$$word".to_string());
+        let secrets = Secrets::from(map);
+
+        let mut buf: Vec<u8> = vec![];
+        secrets.to_writer(&mut buf).unwrap();
+        let output = String::from_utf8(buf).unwrap();
+
+        // The dollar signs must be escaped in the written output
+        assert_eq!(output, "SECRET=\"p@\\$\\$word\"\n");
+    }
+
+    #[test]
+    fn dollar_sign_round_trips() {
+        let mut map = BTreeMap::new();
+        map.insert("A".to_string(), "p@$$word".to_string());
+        map.insert("B".to_string(), "$HOME/bin".to_string());
+        map.insert("C".to_string(), "${FOO}bar".to_string());
+        map.insert("D".to_string(), "no dollar here".to_string());
+        let secrets = Secrets::from(map.clone());
+
+        // Write
+        let mut buf: Vec<u8> = vec![];
+        secrets.to_writer(&mut buf).unwrap();
+
+        // Read back
+        let result = Secrets::from_reader(&mut buf.as_slice()).unwrap();
+
+        assert_eq!(result.content, map);
+    }
+
+    #[test]
+    fn existing_escapes_still_round_trip_with_dollar() {
+        // Combining $ with other characters that require escaping
+        let mut map = BTreeMap::new();
+        map.insert(
+            "KEY".to_string(),
+            "say \"$NAME\" and cost $5\nnewline".to_string(),
+        );
+        let secrets = Secrets::from(map.clone());
+
+        let mut buf: Vec<u8> = vec![];
+        secrets.to_writer(&mut buf).unwrap();
+        let result = Secrets::from_reader(&mut buf.as_slice()).unwrap();
+
+        assert_eq!(result.content, map);
     }
 }
