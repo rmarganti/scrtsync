@@ -10,11 +10,11 @@ pub enum EditError {
     #[error("unable to create temporary file")]
     CreateTempFile(#[source] std::io::Error),
 
+    #[error("unable to write temporary file")]
+    WriteTempFile(#[source] std::io::Error),
+
     #[error("unable to read temporary file")]
     ReadTempFile(#[source] std::io::Error),
-
-    #[error("could not determine an editor; set $VISUAL or $EDITOR")]
-    NoEditor,
 
     #[error("editor exited with non-zero status")]
     EditorFailed,
@@ -53,7 +53,7 @@ impl super::Job for EditJob {
             .tempfile()
             .map_err(EditError::CreateTempFile)?;
 
-        std::fs::write(temp_file.path(), &original_content).map_err(EditError::ReadTempFile)?;
+        std::fs::write(temp_file.path(), &original_content).map_err(EditError::WriteTempFile)?;
 
         let edited = loop {
             open_editor(temp_file.path())?;
@@ -125,17 +125,16 @@ fn serialize_secrets(secrets: &Secrets) -> Result<Vec<u8>> {
     Ok(buf)
 }
 
-/// Resolve the user's preferred editor.
-fn resolve_editor() -> Result<String, EditError> {
+/// Resolve the user's preferred editor, falling back to `vi`.
+fn resolve_editor() -> String {
     std::env::var("VISUAL")
         .or_else(|_| std::env::var("EDITOR"))
-        .or_else(|_| Ok("vi".to_string()))
-        .map_err(|_: std::env::VarError| EditError::NoEditor)
+        .unwrap_or_else(|_| "vi".to_string())
 }
 
 /// Open the given file in the user's editor and wait for it to exit.
 fn open_editor(path: &std::path::Path) -> Result<()> {
-    let editor = resolve_editor()?;
+    let editor = resolve_editor();
     let status = std::process::Command::new(&editor)
         .arg(path)
         .stdin(std::process::Stdio::inherit())

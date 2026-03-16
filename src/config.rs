@@ -27,6 +27,9 @@ pub enum ConfigError {
     #[error("preset '{0}' not found in config file")]
     PresetNotFound(String),
 
+    #[error("--target is only valid when the source is a preset name, not a raw URI")]
+    TargetRequiresPreset,
+
     #[error("must provide either a preset or both --from and --to arguments")]
     MissingArguments,
 
@@ -86,7 +89,8 @@ impl EditArgs {
                 EditTarget::To => preset.to.clone(),
             })
         } else if self.target.is_some() {
-            Err(ConfigError::PresetNotFound(self.source.clone()))
+            // `--target` only makes sense when `source` is a preset name, not a raw URI
+            Err(ConfigError::TargetRequiresPreset)
         } else {
             Ok(self.source.clone())
         }
