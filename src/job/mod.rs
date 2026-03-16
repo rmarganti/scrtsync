@@ -3,7 +3,8 @@ use crate::sources::{Source, SourceCreateError};
 use anyhow::Result;
 use std::io::IsTerminal;
 
-mod diff;
+pub(crate) mod diff;
+pub mod edit;
 pub mod init;
 mod sync;
 

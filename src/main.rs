@@ -11,8 +11,17 @@ mod sources;
 fn main() -> Result<()> {
     let args = Args::parse();
 
-    if let Some(Command::Init) = args.command {
-        return job::init::InitJob::new().run();
+    match args.command {
+        Some(Command::Init) => {
+            return job::init::InitJob::new().run();
+        }
+        Some(Command::Edit(edit_args)) => {
+            let cfg = Config::from_file(&args.config)
+                .with_context(|| format!("failed to load config from '{}'", args.config))?;
+            let uri = edit_args.resolve_uri(&cfg)?;
+            return job::edit::EditJob::new(&uri)?.run();
+        }
+        None => {}
     }
 
     let cfg = Config::from_file(&args.config)

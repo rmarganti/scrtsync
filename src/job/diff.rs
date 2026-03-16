@@ -66,7 +66,7 @@ fn format_entry(key: &str, value: &str) -> String {
 }
 
 #[derive(Clone, Debug)]
-enum DiffLine {
+pub enum DiffLine {
     /// Unchanged line surrounding a change
     Context(String),
 
@@ -78,7 +78,7 @@ enum DiffLine {
 }
 
 /// Build a list of DiffLine representing the differences between from_map and to_map.
-fn build_diff_lines(
+pub fn build_diff_lines(
     from_map: &BTreeMap<String, String>,
     to_map: &BTreeMap<String, String>,
 ) -> (Vec<DiffLine>, usize, usize, usize) {
@@ -117,13 +117,13 @@ fn build_diff_lines(
 }
 
 /// Group DiffLines into hunks with CONTEXT_LINES of unchanged lines around each change.
-struct Hunk {
+pub struct Hunk {
     old_start: usize,
     new_start: usize,
-    lines: Vec<DiffLine>,
+    pub lines: Vec<DiffLine>,
 }
 
-fn build_hunks(diff_lines: &[DiffLine]) -> Vec<Hunk> {
+pub fn build_hunks(diff_lines: &[DiffLine]) -> Vec<Hunk> {
     // 1. Find indices of all non-context lines
     let change_indices: Vec<usize> = diff_lines
         .iter()
@@ -208,18 +208,18 @@ fn build_hunks(diff_lines: &[DiffLine]) -> Vec<Hunk> {
 }
 
 /// Helper for printing diffs with optional color support.
-struct DiffPrinter {
+pub struct DiffPrinter {
     use_color: bool,
 }
 
 impl DiffPrinter {
-    fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             use_color: std::io::stdout().is_terminal(),
         }
     }
 
-    fn print_header(&self, uri: &str) {
+    pub fn print_header(&self, uri: &str) {
         if self.use_color {
             println!("\x1b[1m--- a/{uri}\x1b[0m");
             println!("\x1b[1m+++ b/{uri}\x1b[0m");
@@ -229,7 +229,7 @@ impl DiffPrinter {
         }
     }
 
-    fn print_hunk_header(&self, hunk: &Hunk) {
+    pub fn print_hunk_header(&self, hunk: &Hunk) {
         let old_count = hunk
             .lines
             .iter()
@@ -251,7 +251,7 @@ impl DiffPrinter {
         }
     }
 
-    fn print_line(&self, line: &DiffLine) {
+    pub fn print_line(&self, line: &DiffLine) {
         match line {
             DiffLine::Context(text) => println!(" {text}"),
             DiffLine::Remove(text) => {
