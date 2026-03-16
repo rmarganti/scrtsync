@@ -20,6 +20,12 @@ pub enum InitError {
 /// This job is used to create a default config file.
 pub struct InitJob {}
 
+impl InitJob {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
 impl Job for InitJob {
     /// Write the default config contents to the default config file.
     fn run(&self) -> anyhow::Result<()> {

@@ -33,12 +33,27 @@ pub enum ConfigError {
 
 /// Synchronize secrets between different sources
 #[derive(Parser, Debug)]
-#[command(author, version, about, long_about = None)]
+#[command(author, version, about, long_about = None, args_conflicts_with_subcommands = true)]
 pub struct Args {
     /// Config file to use for presets
-    #[arg(short, long, default_value_t = String::from(DEFAULT_CONFIG))]
+    #[arg(short, long, default_value_t = String::from(DEFAULT_CONFIG), global = true)]
     pub config: String,
 
+    #[command(subcommand)]
+    pub command: Option<Command>,
+
+    #[command(flatten)]
+    pub sync_args: SyncArgs,
+}
+
+#[derive(clap::Subcommand, Debug)]
+pub enum Command {
+    /// Initialize a new config file
+    Init,
+}
+
+#[derive(clap::Args, Debug)]
+pub struct SyncArgs {
     /// From where to pull secrets
     #[arg(short, long)]
     pub from: Option<String>,
@@ -55,28 +70,18 @@ pub struct Args {
     pub preset: Option<String>,
 }
 
-impl Args {
+impl SyncArgs {
     pub fn validate(&self, config: &Config) -> Result<(), ConfigError> {
-        // If preset is provided, ensure it exists
+        // If using a preset, ensure it exists.
         if let Some(ref preset_name) = self.preset {
-            if preset_name != "init" && !config.presets.contains_key(preset_name) {
+            if !config.presets.contains_key(preset_name) {
                 return Err(ConfigError::PresetNotFound(preset_name.clone()));
             }
         }
 
-        if self.diff {
-            // Diff mode: need both sides (preset supplies both, or both --from and --to)
-            let has_from = self.preset.is_some() || self.from.is_some();
-            let has_to = self.preset.is_some() || self.to.is_some();
-
-            if !has_from || !has_to {
-                return Err(ConfigError::MissingArguments);
-            }
-        } else {
-            // Sync mode: need both sides
-            if self.preset.is_none() && (self.from.is_none() || self.to.is_none()) {
-                return Err(ConfigError::MissingArguments);
-            }
+        // If not using a preset, both --to and --from are required.
+        if self.preset.is_none() && (self.from.is_none() || self.to.is_none()) {
+            return Err(ConfigError::MissingArguments);
         }
 
         Ok(())
