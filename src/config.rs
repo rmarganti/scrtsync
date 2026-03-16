@@ -27,18 +27,78 @@ pub enum ConfigError {
     #[error("preset '{0}' not found in config file")]
     PresetNotFound(String),
 
+    #[error("--target is only valid when the source is a preset name, not a raw URI")]
+    TargetRequiresPreset,
+
     #[error("must provide either a preset or both --from and --to arguments")]
     MissingArguments,
+
+    #[error("--target is required when editing a preset")]
+    EditMissingTarget,
 }
 
 /// Synchronize secrets between different sources
 #[derive(Parser, Debug)]
-#[command(author, version, about, long_about = None)]
+#[command(author, version, about, long_about = None, args_conflicts_with_subcommands = true)]
 pub struct Args {
     /// Config file to use for presets
-    #[arg(short, long, default_value_t = String::from(DEFAULT_CONFIG))]
+    #[arg(short, long, default_value_t = String::from(DEFAULT_CONFIG), global = true)]
     pub config: String,
 
+    #[command(subcommand)]
+    pub command: Option<Command>,
+
+    #[command(flatten)]
+    pub sync_args: SyncArgs,
+}
+
+#[derive(clap::Subcommand, Debug)]
+pub enum Command {
+    /// Initialize a new config file
+    Init,
+
+    /// Edit secrets in-place for a single source
+    Edit(EditArgs),
+}
+
+#[derive(clap::Args, Debug)]
+pub struct EditArgs {
+    /// Source URI or preset name
+    pub source: String,
+
+    /// When using a preset, which side to edit (from or to)
+    #[arg(long)]
+    pub target: Option<EditTarget>,
+}
+
+#[derive(clap::ValueEnum, Clone, Debug)]
+pub enum EditTarget {
+    From,
+    To,
+}
+
+impl EditArgs {
+    /// Resolve the source URI. If `source` is a known preset name, `--target`
+    /// is required to select which side. If it is a raw URI, `--target` must
+    /// not be provided.
+    pub fn resolve_uri(&self, config: &Config) -> Result<String, ConfigError> {
+        if let Some(preset) = config.presets.get(&self.source) {
+            let target = self.target.as_ref().ok_or(ConfigError::EditMissingTarget)?;
+            Ok(match target {
+                EditTarget::From => preset.from.clone(),
+                EditTarget::To => preset.to.clone(),
+            })
+        } else if self.target.is_some() {
+            // `--target` only makes sense when `source` is a preset name, not a raw URI
+            Err(ConfigError::TargetRequiresPreset)
+        } else {
+            Ok(self.source.clone())
+        }
+    }
+}
+
+#[derive(clap::Args, Debug)]
+pub struct SyncArgs {
     /// From where to pull secrets
     #[arg(short, long)]
     pub from: Option<String>,
@@ -55,28 +115,18 @@ pub struct Args {
     pub preset: Option<String>,
 }
 
-impl Args {
+impl SyncArgs {
     pub fn validate(&self, config: &Config) -> Result<(), ConfigError> {
-        // If preset is provided, ensure it exists
+        // If using a preset, ensure it exists.
         if let Some(ref preset_name) = self.preset {
-            if preset_name != "init" && !config.presets.contains_key(preset_name) {
+            if !config.presets.contains_key(preset_name) {
                 return Err(ConfigError::PresetNotFound(preset_name.clone()));
             }
         }
 
-        if self.diff {
-            // Diff mode: need both sides (preset supplies both, or both --from and --to)
-            let has_from = self.preset.is_some() || self.from.is_some();
-            let has_to = self.preset.is_some() || self.to.is_some();
-
-            if !has_from || !has_to {
-                return Err(ConfigError::MissingArguments);
-            }
-        } else {
-            // Sync mode: need both sides
-            if self.preset.is_none() && (self.from.is_none() || self.to.is_none()) {
-                return Err(ConfigError::MissingArguments);
-            }
+        // If not using a preset, both --to and --from are required.
+        if self.preset.is_none() && (self.from.is_none() || self.to.is_none()) {
+            return Err(ConfigError::MissingArguments);
         }
 
         Ok(())

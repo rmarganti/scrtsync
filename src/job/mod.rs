@@ -1,37 +1,29 @@
+use crate::config::SyncArgs;
 use crate::sources::{Source, SourceCreateError};
 use anyhow::Result;
 use std::io::IsTerminal;
 
-mod diff;
-mod init;
+pub(crate) mod diff;
+pub mod edit;
+pub mod init;
 mod sync;
 
 pub trait Job {
     fn run(&self) -> Result<()>;
 }
 
-pub fn new_job(
-    config: &crate::config::Config,
-    from: Option<String>,
-    to: Option<String>,
-    preset: Option<String>,
-    diff: bool,
-) -> Result<Box<dyn Job>> {
-    if preset == Some("init".to_string()) {
-        return Ok(Box::new(init::InitJob {}));
-    }
+pub fn build_sync_job(config: &crate::config::Config, args: SyncArgs) -> Result<Box<dyn Job>> {
+    let preset_cfg = args.preset.as_ref().and_then(|p| config.presets.get(p));
 
-    let preset_cfg = preset.as_ref().and_then(|p| config.presets.get(p));
-
-    if diff {
-        // In diff mode we never read from stdin or write to stdout automatically.
-        // Both `from` and `to` are required (enforced by Args::validate).
-        let from_uri = from
+    if args.diff {
+        let from_uri = args
+            .from
             .or_else(|| preset_cfg.map(|p| p.from.clone()))
             .ok_or(SourceCreateError::NoSourceProvided { field: "from" })?;
         let from_source = <dyn Source>::new(&from_uri)?;
 
-        let to_uri = to
+        let to_uri = args
+            .to
             .or_else(|| preset_cfg.map(|p| p.to.clone()))
             .ok_or(SourceCreateError::NoSourceProvided { field: "to" })?;
         let to_source = <dyn Source>::new(&to_uri)?;
@@ -40,7 +32,7 @@ pub fn new_job(
     }
 
     let from = if std::io::stdin().is_terminal() {
-        from
+        args.from
     } else {
         Some("std://".to_string())
     };
@@ -51,7 +43,7 @@ pub fn new_job(
     let from = <dyn Source>::new(&from)?;
 
     let to = if std::io::stdout().is_terminal() {
-        to
+        args.to
     } else {
         Some("std://".to_string())
     };
