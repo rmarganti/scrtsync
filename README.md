@@ -47,7 +47,7 @@ For convenience, you can define presets in a config file and then reference them
 
    ```json
    {
-     "$schema": "https://raw.githubusercontent.com/rmarganti/scrtsync/main/schemas/scrtsync.schema.1.0.0.json",
+     "$schema": "https://raw.githubusercontent.com/rmarganti/scrtsync/main/schemas/scrtsync.schema.1.1.0.json",
      "presets": {
        "pull": {
          "from": [
