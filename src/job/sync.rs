@@ -1,24 +1,32 @@
-use crate::sources::Source;
+use super::NamedSource;
+use crate::{secrets::Secrets, sources::Source};
 use anyhow::{Context, Result};
 
 pub struct SyncJob {
-    origin: Box<dyn Source>,
+    origins: Vec<NamedSource>,
     target: Box<dyn Source>,
 }
 
 impl SyncJob {
-    pub fn new(origin: Box<dyn Source>, target: Box<dyn Source>) -> Self {
-        Self { origin, target }
+    pub fn new(origins: Vec<NamedSource>, target: Box<dyn Source>) -> Self {
+        Self { origins, target }
     }
 }
 
 impl super::Job for SyncJob {
-    /// Synchronize the secrets from an origin to a target
+    /// Synchronize merged secrets from one or more origins to a target.
     fn run(&self) -> Result<()> {
-        let secrets = self
-            .origin
-            .read_secrets()
-            .context("unable to read secrets from source")?;
+        let mut source_secrets = Vec::with_capacity(self.origins.len());
+
+        for (uri, source) in &self.origins {
+            let secrets = source
+                .read_secrets()
+                .with_context(|| format!("unable to read secrets from source '{uri}'"))?;
+            source_secrets.push((uri.clone(), secrets));
+        }
+
+        let secrets =
+            Secrets::merge_named(source_secrets).context("unable to merge source secrets")?;
 
         self.target
             .write_secrets(&secrets)

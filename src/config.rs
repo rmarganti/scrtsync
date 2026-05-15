@@ -24,6 +24,9 @@ pub enum ConfigError {
         source: url::ParseError,
     },
 
+    #[error("preset '{0}' must include at least one from source")]
+    EmptyPresetFrom(String),
+
     #[error("preset '{0}' not found in config file")]
     PresetNotFound(String),
 
@@ -39,9 +42,9 @@ pub struct Args {
     #[arg(short, long, default_value_t = String::from(DEFAULT_CONFIG))]
     pub config: String,
 
-    /// From where to pull secrets
-    #[arg(short, long)]
-    pub from: Option<String>,
+    /// From where to pull secrets. May be provided multiple times and will be merged.
+    #[arg(short, long, action = clap::ArgAction::Append)]
+    pub from: Vec<String>,
 
     /// To where to output secrets
     #[arg(short, long)]
@@ -66,7 +69,7 @@ impl Args {
 
         if self.diff {
             // Diff mode: need both sides (preset supplies both, or both --from and --to)
-            let has_from = self.preset.is_some() || self.from.is_some();
+            let has_from = self.preset.is_some() || !self.from.is_empty();
             let has_to = self.preset.is_some() || self.to.is_some();
 
             if !has_from || !has_to {
@@ -74,7 +77,7 @@ impl Args {
             }
         } else {
             // Sync mode: need both sides
-            if self.preset.is_none() && (self.from.is_none() || self.to.is_none()) {
+            if self.preset.is_none() && (self.from.is_empty() || self.to.is_none()) {
                 return Err(ConfigError::MissingArguments);
             }
         }
@@ -90,8 +93,38 @@ pub struct Config {
 
 #[derive(Debug, Deserialize)]
 pub struct PresetConfig {
-    pub from: String,
+    pub from: OneOrMany,
     pub to: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(untagged)]
+pub enum OneOrMany {
+    One(String),
+    Many(Vec<String>),
+}
+
+impl OneOrMany {
+    pub fn to_vec(&self) -> Vec<String> {
+        match self {
+            OneOrMany::One(value) => vec![value.clone()],
+            OneOrMany::Many(values) => values.clone(),
+        }
+    }
+
+    fn iter(&self) -> Box<dyn Iterator<Item = &String> + '_> {
+        match self {
+            OneOrMany::One(value) => Box::new(std::iter::once(value)),
+            OneOrMany::Many(values) => Box::new(values.iter()),
+        }
+    }
+
+    fn is_empty(&self) -> bool {
+        match self {
+            OneOrMany::One(_) => false,
+            OneOrMany::Many(values) => values.is_empty(),
+        }
+    }
 }
 
 impl Config {
@@ -118,11 +151,17 @@ impl Config {
 
     fn validate(&self) -> Result<(), ConfigError> {
         for (name, preset) in &self.presets {
-            url::Url::parse(&preset.from).map_err(|source| ConfigError::InvalidPresetUrl {
-                preset: name.clone(),
-                field: "from".to_string(),
-                source,
-            })?;
+            if preset.from.is_empty() {
+                return Err(ConfigError::EmptyPresetFrom(name.clone()));
+            }
+
+            for (idx, from) in preset.from.iter().enumerate() {
+                url::Url::parse(from).map_err(|source| ConfigError::InvalidPresetUrl {
+                    preset: name.clone(),
+                    field: format!("from[{idx}]"),
+                    source,
+                })?;
+            }
             url::Url::parse(&preset.to).map_err(|source| ConfigError::InvalidPresetUrl {
                 preset: name.clone(),
                 field: "to".to_string(),
@@ -130,5 +169,87 @@ impl Config {
             })?;
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn preset_from_accepts_single_string() {
+        let cfg: Config = serde_json::from_str(
+            r#"{
+                "presets": {
+                    "pull": {
+                        "from": "file://a.env",
+                        "to": "file://out.env"
+                    }
+                }
+            }"#,
+        )
+        .unwrap();
+
+        let preset = cfg.presets.get("pull").unwrap();
+        assert_eq!(preset.from.to_vec(), vec!["file://a.env".to_string()]);
+    }
+
+    #[test]
+    fn preset_from_accepts_array() {
+        let cfg: Config = serde_json::from_str(
+            r#"{
+                "presets": {
+                    "pull": {
+                        "from": ["file://a.env", "file://b.env"],
+                        "to": "file://out.env"
+                    }
+                }
+            }"#,
+        )
+        .unwrap();
+
+        let preset = cfg.presets.get("pull").unwrap();
+        assert_eq!(
+            preset.from.to_vec(),
+            vec!["file://a.env".to_string(), "file://b.env".to_string()]
+        );
+    }
+
+    #[test]
+    fn validate_rejects_invalid_url_inside_from_array() {
+        let cfg: Config = serde_json::from_str(
+            r#"{
+                "presets": {
+                    "pull": {
+                        "from": ["file://a.env", "not a url"],
+                        "to": "file://out.env"
+                    }
+                }
+            }"#,
+        )
+        .unwrap();
+
+        let err = cfg.validate().unwrap_err();
+        assert!(err.to_string().contains("invalid `from[1]` URL"));
+    }
+
+    #[test]
+    fn validate_rejects_empty_from_array() {
+        let cfg: Config = serde_json::from_str(
+            r#"{
+                "presets": {
+                    "pull": {
+                        "from": [],
+                        "to": "file://out.env"
+                    }
+                }
+            }"#,
+        )
+        .unwrap();
+
+        let err = cfg.validate().unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("preset 'pull' must include at least one from source"));
     }
 }

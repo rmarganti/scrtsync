@@ -1,5 +1,5 @@
 {
-    "$schema": "https://raw.githubusercontent.com/rmarganti/scrtsync/main/schemas/scrtsync.schema.1.0.0.json",
+    "$schema": "https://raw.githubusercontent.com/rmarganti/scrtsync/main/schemas/scrtsync.schema.1.1.0.json",
     "presets": {
         "pull": {
             "from": "vault://secret/path/to/your/secrets",

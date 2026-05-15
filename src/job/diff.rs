@@ -1,4 +1,5 @@
-use crate::sources::Source;
+use super::NamedSource;
+use crate::{secrets::Secrets, sources::Source};
 use anyhow::{Context, Result};
 use std::collections::BTreeMap;
 use std::io::IsTerminal;
@@ -6,23 +7,30 @@ use std::io::IsTerminal;
 const CONTEXT_LINES: usize = 3;
 
 pub struct DiffJob {
-    from: Box<dyn Source>,
+    from: Vec<NamedSource>,
     to: Box<dyn Source>,
     to_uri: String,
 }
 
 impl DiffJob {
-    pub fn new(from: Box<dyn Source>, to: Box<dyn Source>, to_uri: String) -> Self {
+    pub fn new(from: Vec<NamedSource>, to: Box<dyn Source>, to_uri: String) -> Self {
         Self { from, to, to_uri }
     }
 }
 
 impl super::Job for DiffJob {
     fn run(&self) -> Result<()> {
-        let from_secrets = self
-            .from
-            .read_secrets()
-            .context("unable to read secrets from source")?;
+        let mut source_secrets = Vec::with_capacity(self.from.len());
+
+        for (uri, source) in &self.from {
+            let secrets = source
+                .read_secrets()
+                .with_context(|| format!("unable to read secrets from source '{uri}'"))?;
+            source_secrets.push((uri.clone(), secrets));
+        }
+
+        let from_secrets =
+            Secrets::merge_named(source_secrets).context("unable to merge source secrets")?;
 
         let to_secrets = self
             .to

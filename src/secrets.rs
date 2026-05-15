@@ -3,6 +3,16 @@ use std::collections::BTreeMap;
 use std::str;
 
 #[derive(Debug, thiserror::Error)]
+pub enum SecretsMergeError {
+    #[error("conflicting value for key '{key}' while merging sources '{first_source}' and '{second_source}'")]
+    Conflict {
+        key: String,
+        first_source: String,
+        second_source: String,
+    },
+}
+
+#[derive(Debug, thiserror::Error)]
 pub enum SecretsError {
     #[error("unable to decode env value")]
     DecodeEnv(#[from] dotenvy::Error),
@@ -59,13 +69,47 @@ impl Secrets {
                 // double-quoted strings as a literal dollar sign.
                 .replace('$', "\\$");
 
-            let line = format!("{}={}\n", key, encoded);
+            let line = format!("{key}={encoded}\n");
 
             buf.write_all(line.as_bytes())
                 .map_err(SecretsError::WriteEntry)?;
         }
 
         Ok(())
+    }
+
+    /// Merge secrets from multiple named sources.
+    ///
+    /// Duplicate keys with identical values are accepted. Duplicate keys with
+    /// different values return an error instead of silently overwriting secrets.
+    pub fn merge_named(sources: Vec<(String, Secrets)>) -> Result<Self, SecretsMergeError> {
+        let mut content = BTreeMap::new();
+        let mut origins = BTreeMap::new();
+
+        for (source_name, secrets) in sources {
+            for (key, value) in secrets.content {
+                match content.get(&key) {
+                    None => {
+                        origins.insert(key.clone(), source_name.clone());
+                        content.insert(key, value);
+                    }
+                    Some(existing) if existing == &value => {}
+                    Some(_) => {
+                        let first_source = origins
+                            .get(&key)
+                            .cloned()
+                            .unwrap_or_else(|| "unknown source".to_string());
+                        return Err(SecretsMergeError::Conflict {
+                            key,
+                            first_source,
+                            second_source: source_name,
+                        });
+                    }
+                }
+            }
+        }
+
+        Ok(Self { content })
     }
 }
 
@@ -263,5 +307,59 @@ mod tests {
         let result = Secrets::from_reader(&mut buf.as_slice()).unwrap();
 
         assert_eq!(result.content, map);
+    }
+
+    #[test]
+    fn merge_named_merges_disjoint_sources() {
+        let mut first = BTreeMap::new();
+        first.insert("A".to_string(), "1".to_string());
+        let mut second = BTreeMap::new();
+        second.insert("B".to_string(), "2".to_string());
+
+        let merged = Secrets::merge_named(vec![
+            ("file://a.env".to_string(), Secrets::from(first)),
+            ("file://b.env".to_string(), Secrets::from(second)),
+        ])
+        .unwrap();
+
+        let mut expected = BTreeMap::new();
+        expected.insert("A".to_string(), "1".to_string());
+        expected.insert("B".to_string(), "2".to_string());
+        assert_eq!(merged.content, expected);
+    }
+
+    #[test]
+    fn merge_named_allows_identical_duplicate_values() {
+        let mut first = BTreeMap::new();
+        first.insert("A".to_string(), "1".to_string());
+        let mut second = BTreeMap::new();
+        second.insert("A".to_string(), "1".to_string());
+
+        let merged = Secrets::merge_named(vec![
+            ("file://a.env".to_string(), Secrets::from(first)),
+            ("file://b.env".to_string(), Secrets::from(second)),
+        ])
+        .unwrap();
+
+        assert_eq!(merged.content.get("A"), Some(&"1".to_string()));
+    }
+
+    #[test]
+    fn merge_named_rejects_conflicting_duplicate_values() {
+        let mut first = BTreeMap::new();
+        first.insert("A".to_string(), "1".to_string());
+        let mut second = BTreeMap::new();
+        second.insert("A".to_string(), "2".to_string());
+
+        let result = Secrets::merge_named(vec![
+            ("file://a.env".to_string(), Secrets::from(first)),
+            ("file://b.env".to_string(), Secrets::from(second)),
+        ]);
+
+        assert!(result.is_err());
+        let message = result.unwrap_err().to_string();
+        assert!(message.contains("conflicting value for key 'A'"));
+        assert!(message.contains("file://a.env"));
+        assert!(message.contains("file://b.env"));
     }
 }
