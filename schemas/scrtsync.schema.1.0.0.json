@@ -22,8 +22,19 @@
             "type": "object",
             "properties": {
                 "from": {
-                    "description": "The origin source",
-                    "type": "string"
+                    "description": "The origin source, or sources to merge in order",
+                    "oneOf": [
+                        {
+                            "type": "string"
+                        },
+                        {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            },
+                            "minItems": 1
+                        }
+                    ]
                 },
                 "to": {
                     "description": "The target source",

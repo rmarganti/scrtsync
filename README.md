@@ -18,6 +18,18 @@ Sync secrets between [Vault](https://www.vaultproject.io/) and a local `.env`.
 scrtsync --from vault://secrets/you/secret/path --to file://.env
 ```
 
+You can also merge multiple sources into a single destination by passing `--from` more than once:
+
+```sh
+scrtsync \
+  --from file://base.env \
+  --from vault://secrets/you/shared \
+  --from vault://secrets/you/app \
+  --to file://.env
+```
+
+When merging, duplicate keys with the same value are allowed. Duplicate keys with different values cause the sync to fail rather than silently overwriting a secret.
+
 The `--from` and `--to` options can be any of the following:
 
 - `file://<path/to/your.env>` - Any .env file on your local file system.
@@ -38,7 +50,11 @@ For convenience, you can define presets in a config file and then reference them
      "$schema": "https://raw.githubusercontent.com/rmarganti/scrtsync/main/schemas/scrtsync.schema.1.0.0.json",
      "presets": {
        "pull": {
-         "from": "vault://secrets/you/secret/path",
+         "from": [
+           "file://base.env",
+           "vault://secrets/you/shared",
+           "vault://secrets/you/app"
+         ],
          "to": "file://.env"
        },
        "push": {
@@ -51,7 +67,7 @@ For convenience, you can define presets in a config file and then reference them
 
 3. You can now run these presets by referencing them by name. To run the above,
    run either `scrtsync pull` or `scrtsync push`.
-4. You can create and modify as many presets as are appropriate for your project.
+4. You can create and modify as many presets as are appropriate for your project. Preset `from` values may be either a single string or an array of source strings.
 
 ## Options
 
